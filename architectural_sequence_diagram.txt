@@ -1,0 +1,105 @@
+sequenceDiagram
+    autonumber
+
+    actor User
+    participant iOS as iOS App<br/>(APIClient.swift)
+    participant nginx as nginx<br/>(TLS Proxy)
+    participant API as FastAPI<br/>(jobs.py / uploads.py)
+    participant DB as SQLite / PostgreSQL
+    participant FS as Filesystem<br/>data/{job_id}/
+    participant Redis as Redis Broker
+    participant Celery as Celery Worker
+    participant COLMAP as COLMAP<br/>(subprocess)
+    participant Open3D as Common Backend<br/>(Open3D)
+    participant Exporter as Exporter<br/>(ezdxf / svgwrite)
+    participant WS as WebSocket<br/>/jobs/{id}/ws
+
+    Note over User,iOS: ── PHASE 1: Job Creation ──
+
+    User->>iOS: Tap "Scan" → select photos + A4 reference
+    iOS->>nginx: POST /jobs/create { tier: "photos" }
+    nginx->>API: forward
+    API->>DB: INSERT job(status=created, tier=photos)
+    DB-->>API: job_id = "abc123"
+    API-->>iOS: { job_id: "abc123", upload_url: "/jobs/abc123/upload" }
+
+    Note over User,iOS: ── PHASE 2: File Upload (chunked 5 MB) ──
+
+    iOS->>nginx: POST /jobs/abc123/upload/chunk (chunk 0/12)
+    nginx->>API: forward
+    API->>FS: write chunk → data/abc123/images/img001_part0
+    loop Remaining chunks
+        iOS->>API: POST chunk N/12
+        API->>FS: append chunk
+    end
+    API->>FS: assemble → data/abc123/images/img001.jpg … img040.jpg
+    API->>DB: UPDATE job(status=uploaded, scale_ref=0.297m)
+    API-->>iOS: 200 OK "upload complete"
+
+    Note over User,iOS: ── PHASE 3: Start & Progress Streaming ──
+
+    iOS->>nginx: POST /jobs/abc123/start
+    API->>Redis: enqueue task(job_id=abc123)
+    API->>DB: UPDATE job(status=queued)
+    API-->>iOS: 202 Accepted
+
+    iOS->>WS: WS connect /jobs/abc123/ws
+    WS-->>iOS: { stage: "queued", pct: 5 }
+
+    Note over Celery,COLMAP: ── PHASE 4: Tier A/B Pipeline ──
+
+    Redis->>Celery: dequeue task abc123
+    Celery->>WS: push { stage: "extracting_frames", pct: 10 }
+    Celery->>COLMAP: subprocess: colmap automatic_reconstructor<br/>--workspace_path data/abc123<br/>--image_path data/abc123/images/
+    Celery->>WS: push { stage: "colmap_sfm", pct: 35 }
+    COLMAP-->>Celery: sparse/ model done
+    Celery->>WS: push { stage: "colmap_mvs", pct: 60 }
+    COLMAP-->>Celery: dense/fused.ply written
+
+    Note over Celery,Open3D: Scale Anchoring
+    Celery->>Celery: measure ref object in unscaled PLY<br/>scale = 0.297 / reconstructed_len
+    Celery->>FS: write scan_metric.ply (scaled)
+    Celery->>DB: UPDATE job(scale_confidence="scaled_via_reference")
+
+    Note over Celery,Open3D: ── PHASE 5: Common Backend ──
+
+    Celery->>Open3D: load scan_metric.ply
+    Celery->>WS: push { stage: "plane_extraction", pct: 75 }
+    Open3D->>Open3D: RANSAC → extract floor plane
+    Open3D->>Open3D: RANSAC → extract ceiling plane
+    loop Each dominant wall plane
+        Open3D->>Open3D: RANSAC → extract wall_i plane
+        Open3D->>Open3D: project inliers to z=1.3m slice
+        Open3D->>Open3D: 2D line fit → (x1,y1,x2,y2)
+        Open3D->>Open3D: 90° angle snap
+        Open3D->>Open3D: gap density scan → detect door/window
+    end
+    Open3D->>Open3D: close room polygon
+
+    Celery->>WS: push { stage: "vectorizing", pct: 85 }
+
+    Note over Celery,Exporter: ── PHASE 6: Export ──
+
+    Celery->>Exporter: wall_segments + metadata
+    Celery->>WS: push { stage: "exporting", pct: 95 }
+    Exporter->>FS: write floor_plan.dxf
+    Exporter->>FS: write floor_plan.svg
+    Exporter->>FS: write results.json
+    Exporter->>FS: write validation.csv
+
+    Celery->>DB: UPDATE job(status=complete)
+    Celery->>WS: push { stage: "complete", pct: 100, result_url: "/jobs/abc123/results" }
+
+    Note over User,iOS: ── PHASE 7: Result Delivery ──
+
+    WS-->>iOS: { stage: "complete", pct: 100 }
+    iOS->>nginx: GET /jobs/abc123/results
+    API->>DB: SELECT job WHERE id=abc123
+    API->>FS: resolve file paths
+    API-->>iOS: results JSON (walls[], area_m2, files{})
+
+    iOS->>iOS: render FloorPlanViewer (SVG)
+    iOS->>iOS: load Scene3DViewer (PLY → SceneKit)
+    iOS->>iOS: enable AR Tab (RealityKit)
+    User->>iOS: tap wall → see length annotation
+    User->>iOS: tap Export → share floor_plan.dxf

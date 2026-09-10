@@ -1,0 +1,89 @@
+"""
+FastAPI application entry point.
+
+Startup sequence
+────────────────
+1. Create async SQLAlchemy engine + session factory.
+2. Run Alembic migrations (tables created if missing).
+3. Mount all API routers.
+4. Serve static result files under /static/{job_id}/...
+"""
+import asyncio
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+import structlog
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from app.config import settings
+from app.models.job import Base
+# ── Database engine / session factory ─────────────────────────────────────────
+engine = create_async_engine(settings.DATABASE_URL, echo=settings.DEBUG, future=True)
+AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+
+async def get_db() -> AsyncSession:
+    """FastAPI dependency: yields an async DB session."""
+    async with AsyncSessionLocal() as session:
+        yield session
+
+from app.api import jobs as jobs_router
+from app.api import uploads as uploads_router
+from app.api import results as results_router
+
+log = structlog.get_logger()
+
+# ── Lifespan ───────────────────────────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    log.info("startup", msg="Creating database tables if needed…")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    # Ensure data directory exists
+    settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    log.info("startup", msg="FloorPlan API is ready ✓")
+    yield
+    log.info("shutdown", msg="Closing database engine…")
+    await engine.dispose()
+
+
+# ── App ────────────────────────────────────────────────────────────────────────
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    description=(
+        "Backend API for the Phone-Capture-to-Floor-Plan pipeline. "
+        "Accepts photo / video / LiDAR inputs, runs COLMAP + Open3D processing, "
+        "and returns dimensioned 2D floor plans and 3D point clouds."
+    ),
+    lifespan=lifespan,
+)
+
+# ── CORS (needed for iOS WKWebView and web dashboard) ─────────────────────────
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ── API routers ────────────────────────────────────────────────────────────────
+app.include_router(jobs_router.router,    prefix="/jobs",    tags=["Jobs"])
+app.include_router(uploads_router.router, prefix="/jobs",    tags=["Uploads"])
+app.include_router(results_router.router, prefix="/jobs",    tags=["Results"])
+
+# ── Static files (result DXF / SVG / PLY served directly) ─────────────────────
+settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(settings.DATA_DIR)), name="static")
+
+
+# ── Health check ───────────────────────────────────────────────────────────────
+@app.get("/health", tags=["Meta"])
+async def health():
+    return {"status": "ok", "version": settings.APP_VERSION}

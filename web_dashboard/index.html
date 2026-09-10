@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FloorPlan Pipeline — Web Dashboard</title>
+  <meta name="description" content="View and download 3D floor plan reconstruction results." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+        <rect width="28" height="28" rx="8" fill="url(#g1)"/>
+        <path d="M7 20V10l7-4 7 4v10l-7 4-7-4z" stroke="white" stroke-width="1.5" fill="none"/>
+        <defs><linearGradient id="g1" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#6366f1"/><stop offset="1" stop-color="#8b5cf6"/>
+        </linearGradient></defs>
+      </svg>
+      <span>FloorPlan Pipeline</span>
+    </div>
+    <div class="header-actions">
+      <div class="server-config">
+        <label for="serverUrl">Server:</label>
+        <input id="serverUrl" type="text" value="http://localhost:8000" placeholder="http://192.168.1.10:8000" />
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── Main layout ──────────────────────────────────────────────────────────── -->
+<main class="main">
+
+  <!-- Left: Job input panel -->
+  <aside class="sidebar">
+    <section class="card">
+      <h2 class="card-title">Load Results</h2>
+      <div class="field">
+        <label for="jobIdInput">Job ID</label>
+        <input id="jobIdInput" type="text" placeholder="Paste job UUID…" />
+      </div>
+      <button id="loadBtn" class="btn btn-primary">Load Results</button>
+    </section>
+
+    <!-- Job summary (hidden until loaded) -->
+    <section id="summaryCard" class="card hidden">
+      <h2 class="card-title">Room Summary</h2>
+      <div class="stat-grid">
+        <div class="stat">
+          <div id="statArea" class="stat-value">—</div>
+          <div class="stat-label">Floor Area</div>
+        </div>
+        <div class="stat">
+          <div id="statWalls" class="stat-value">—</div>
+          <div class="stat-label">Walls</div>
+        </div>
+        <div class="stat">
+          <div id="statError" class="stat-value">—</div>
+          <div class="stat-label">Est. Error</div>
+        </div>
+        <div class="stat">
+          <div id="statTier" class="stat-value">—</div>
+          <div class="stat-label">Metric Source</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Downloads (hidden until loaded) -->
+    <section id="downloadsCard" class="card hidden">
+      <h2 class="card-title">Downloads</h2>
+      <div class="download-list" id="downloadList"></div>
+    </section>
+
+    <!-- Wall table (hidden until loaded) -->
+    <section id="wallsCard" class="card hidden">
+      <h2 class="card-title">Wall Segments</h2>
+      <table class="wall-table" id="wallTable">
+        <thead>
+          <tr><th>#</th><th>Length (m)</th><th>Opening</th></tr>
+        </thead>
+        <tbody id="wallTableBody"></tbody>
+      </table>
+    </section>
+  </aside>
+
+  <!-- Right: viewer area -->
+  <div class="viewer-area">
+
+    <!-- Tab bar -->
+    <div class="tab-bar">
+      <button class="tab active" data-tab="floorplan">Floor Plan</button>
+      <button class="tab" data-tab="pointcloud">3D Point Cloud</button>
+    </div>
+
+    <!-- Floor plan viewer -->
+    <div id="tabFloorplan" class="tab-content active">
+      <div id="svgContainer" class="svg-container">
+        <div class="placeholder-message">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+            <rect x="8" y="8" width="48" height="48" rx="4" stroke="#6366f1" stroke-width="2" stroke-dasharray="6 3"/>
+            <path d="M20 44V28l12-8 12 8v16l-12 8-12-8z" stroke="#6366f1" stroke-width="1.5" fill="none"/>
+          </svg>
+          <p>Enter a Job ID to load the floor plan</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3D point cloud viewer -->
+    <div id="tabPointcloud" class="tab-content hidden">
+      <div id="threeContainer" class="three-container">
+        <div class="placeholder-message" id="threePlaceholder">
+          <p>Load results to view the 3D point cloud</p>
+        </div>
+      </div>
+      <div class="viewer-controls">
+        <span>🖱️ Drag to orbit · Scroll to zoom · Right-drag to pan</span>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<!-- ── Status bar ────────────────────────────────────────────────────────────── -->
+<div id="statusBar" class="status-bar hidden">
+  <span id="statusText"></span>
+  <div class="spinner" id="spinner"></div>
+</div>
+
+<!-- ── Scripts ──────────────────────────────────────────────────────────────── -->
+<!-- Three.js from CDN -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="viewer.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,92 @@
+version: "3.9"
+
+# ── Services ──────────────────────────────────────────────────────────────────
+services:
+
+  # PostgreSQL database
+  db:
+    image: postgres:16-alpine
+    container_name: floorplan_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-floorplan}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-floorplan_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-floorplan}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-floorplan}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Redis (Celery broker + result backend)
+  redis:
+    image: redis:7-alpine
+    container_name: floorplan_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # FastAPI application
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: floorplan_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-floorplan}:${POSTGRES_PASSWORD:-floorplan_secret}@db:5432/${POSTGRES_DB:-floorplan}
+      DATABASE_SYNC_URL: postgresql+psycopg2://${POSTGRES_USER:-floorplan}:${POSTGRES_PASSWORD:-floorplan_secret}@db:5432/${POSTGRES_DB:-floorplan}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      DATA_DIR: /app/data
+    volumes:
+      - ./app:/app/app
+      - job_data:/app/data
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  # Celery worker (runs COLMAP / Open3D pipeline)
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: floorplan_worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-floorplan}:${POSTGRES_PASSWORD:-floorplan_secret}@db:5432/${POSTGRES_DB:-floorplan}
+      DATABASE_SYNC_URL: postgresql+psycopg2://${POSTGRES_USER:-floorplan}:${POSTGRES_PASSWORD:-floorplan_secret}@db:5432/${POSTGRES_DB:-floorplan}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      DATA_DIR: /app/data
+    volumes:
+      - ./app:/app/app
+      - job_data:/app/data
+    command: celery -A app.tasks.celery_tasks worker --loglevel=info --concurrency=2
+
+# ── Volumes ───────────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+  job_data:
