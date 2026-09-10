@@ -22,14 +22,23 @@ async def monitor_progress(job_id):
             while True:
                 msg = await ws.recv()
                 data = json.loads(msg)
+                
+                # Ignore background keep-alive heartbeats
+                if data.get("heartbeat"):
+                    continue
+
                 stage = data.get('stage')
                 pct = data.get('pct')
-                print(f"[WebSocket] Progress: {stage} ({pct}%)")
+                if stage is not None:
+                    print(f"[WebSocket] Progress: {stage} ({pct}%)")
                 
                 # Check for completion or failure
-                if stage in ["complete", "failed"]:
-                    if data.get("error"):
-                        print(f"[!] Pipeline Error: {data.get('error')}")
+                if stage == "failed":
+                    err = data.get("error", "Unknown pipeline failure")
+                    print(f"\n[!] Pipeline Failed: {err}")
+                    break
+                elif stage == "complete":
+                    print("[+] Pipeline completed successfully!")
                     break
     except websockets.exceptions.ConnectionClosed:
         print("[WebSocket] Connection closed.")
@@ -40,6 +49,7 @@ def main():
     parser = argparse.ArgumentParser(description="Test 3D Reconstruction Pipeline API")
     parser.add_argument("--tier", choices=["photos", "video", "lidar", "hybrid"], required=True, help="Capture tier")
     parser.add_argument("--scale", type=float, help="Scale reference in meters (required for photos/video)")
+    parser.add_argument("--stride", "--step", type=int, default=1, help="Subsample image frequency (e.g., 8 takes every 8th image)")
     parser.add_argument("--files", nargs="+", required=True, help="File(s) or directory of files to upload (.mp4, .jpg, .json, image folder, etc.)")
     args = parser.parse_args()
 
@@ -67,9 +77,18 @@ def main():
                 print(f"[!] No valid files found in directory: {fpath}")
                 sys.exit(1)
             print(f"[*] Discovered {len(dir_files)} file(s) in directory '{fpath}'")
+            if args.stride > 1 and args.tier in ("photos", "hybrid"):
+                original_count = len(dir_files)
+                dir_files = dir_files[::args.stride]
+                print(f"[*] Subsampling applied (stride={args.stride}): using {len(dir_files)} of {original_count} files")
             expanded_files.extend(dir_files)
         else:
             expanded_files.append(fpath)
+
+    if args.stride > 1 and len(expanded_files) > 1 and args.tier in ("photos", "hybrid") and not any(os.path.isdir(f) for f in args.files):
+        orig = len(expanded_files)
+        expanded_files = expanded_files[::args.stride]
+        print(f"[*] Subsampling applied to file list (stride={args.stride}): using {len(expanded_files)} of {orig} files")
 
     if not expanded_files:
         print("[!] No files found to upload.")
@@ -151,11 +170,22 @@ def main():
             if uri:
                 print(f" ╰─ {key.upper().ljust(15)} : {API_URL}{uri}")
         
-        print("\n[*] To visualize these results in 3D:")
-        print(f"    1. Open web_dashboard/index.html in your browser")
-        print(f"    2. Enter Job ID: {job_id}")
+        print("\n[*] To visualize these results in 2D / 3D:")
+        print(f"    👉 Dashboard: {API_URL}/?job_id={job_id}")
+        print(f"    (Or open {API_URL} and enter Job ID: {job_id})")
         print("========================================================")
     else:
+        # Check job info endpoint for error details
+        job_info_r = httpx.get(f"{API_URL}/jobs/{job_id}")
+        if job_info_r.status_code == 200:
+            info = job_info_r.json()
+            if info.get("status") == "failed":
+                print(f"\n[!] Job Failed: {info.get('error_message')}")
+                if "colmap" in str(info.get("error_message")).lower():
+                    print("\n💡 Note: COLMAP is required for photos and video reconstruction.")
+                    print("   You can install it on macOS via Homebrew:")
+                    print("   brew install colmap\n")
+                sys.exit(1)
         print(f"[!] Failed to fetch results. Response ({r.status_code}):\n{r.text}")
 
 if __name__ == "__main__":

@@ -90,10 +90,31 @@ def _extract_frames(video_path: Path, output_dir: Path, fps: float = 3.0):
 
 
 # ── COLMAP pipeline ───────────────────────────────────────────────────────────
+def _is_cuda_available() -> bool:
+    try:
+        res = subprocess.run([settings.COLMAP_BIN, "patch_match_stereo", "--help"], capture_output=True, text=True)
+        return res.returncode == 0
+    except Exception:
+        return False
+
+
+def _find_sparse_model_dir(sparse_root: Path) -> Optional[Path]:
+    if (sparse_root / "cameras.bin").exists() or (sparse_root / "cameras.txt").exists():
+        return sparse_root
+    if (sparse_root / "0").is_dir():
+        if (sparse_root / "0" / "cameras.bin").exists() or (sparse_root / "0" / "cameras.txt").exists():
+            return sparse_root / "0"
+    for sub in sparse_root.glob("*"):
+        if sub.is_dir() and ((sub / "cameras.bin").exists() or (sub / "cameras.txt").exists()):
+            return sub
+    return None
+
+
 def _run_colmap_pipeline(
     job_id: str,
     scale_reference_m: Optional[float],
     progress_cb: ProgressCb,
+    single_camera: bool = True,
 ) -> Path:
     """
     Run COLMAP automatic_reconstructor then dense stereo fusion.
@@ -107,14 +128,20 @@ def _run_colmap_pipeline(
 
     # ── Sparse SfM ────────────────────────────────────────────────────────────
     progress_cb("colmap_sfm", 25)
-    log.info("colmap_sfm_start", job_id=job_id)
+    log.info("colmap_sfm_start", job_id=job_id, single_camera=single_camera)
+
+    has_cuda = _is_cuda_available()
 
     sfm_cmd = [
         settings.COLMAP_BIN, "automatic_reconstructor",
         "--workspace_path", str(workspace),
         "--image_path", str(images_dir),
-        # Use CPU matcher if no CUDA GPU available; harmless with GPU
-        "--use_gpu", "0",
+        "--quality", settings.COLMAP_QUALITY,
+        "--num_threads", str(settings.COLMAP_NUM_THREADS),
+        "--single_camera", "1" if single_camera else "0",
+        "--use_gpu", "1" if has_cuda else "0",
+        "--sparse", "1",
+        "--dense", "1" if has_cuda else "0",
     ]
     _run_cmd(sfm_cmd, "COLMAP SfM")
     progress_cb("colmap_sfm", 50)
@@ -122,9 +149,29 @@ def _run_colmap_pipeline(
     # The automatic_reconstructor places dense output in workspace/dense/
     fused_ply = workspace / "dense" / "fused.ply"
 
-    # If automatic_reconstructor didn't produce dense output, run manual sequence
+    # If automatic_reconstructor didn't produce dense output (e.g. CPU mode), convert sparse model to PLY
+    if not fused_ply.exists():
+        sparse_dir = workspace / "sparse"
+        sparse_model = _find_sparse_model_dir(sparse_dir)
+        if sparse_model is not None:
+            dense_dir.mkdir(parents=True, exist_ok=True)
+            log.info("converting_sparse_model_to_ply", model_dir=str(sparse_model))
+            _run_cmd([
+                settings.COLMAP_BIN, "model_converter",
+                "--input_path", str(sparse_model),
+                "--output_path", str(fused_ply),
+                "--output_type", "PLY",
+            ], "COLMAP Model Converter")
+
+    # If still not found and CUDA is available, run manual sequence
     if not fused_ply.exists():
         fused_ply = _run_manual_dense(workspace, images_dir, dense_dir, progress_cb)
+
+    if not fused_ply.exists():
+        raise RuntimeError(
+            "COLMAP failed to reconstruct a sparse or dense 3D model from the uploaded images. "
+            "Please ensure sufficient camera movement, overlap, and proper lighting."
+        )
 
     progress_cb("colmap_mvs", 70)
     log.info("colmap_dense_done", job_id=job_id, output=str(fused_ply))
@@ -148,19 +195,39 @@ def _run_manual_dense(workspace: Path, images_dir: Path, dense_dir: Path, progre
 
     log.info("colmap_manual_sequence_start")
 
+    has_cuda = _is_cuda_available()
+
     _run_cmd([settings.COLMAP_BIN, "feature_extractor",
               "--database_path", str(db_path),
-              "--image_path", str(images_dir)], "feature_extractor")
+              "--image_path", str(images_dir),
+              "--ImageReader.single_camera", "1",
+              "--SiftExtraction.num_threads", str(settings.COLMAP_NUM_THREADS),
+              "--SiftExtraction.use_gpu", "1" if has_cuda else "0"], "feature_extractor")
 
     _run_cmd([settings.COLMAP_BIN, "exhaustive_matcher",
-              "--database_path", str(db_path)], "exhaustive_matcher")
+              "--database_path", str(db_path),
+              "--SiftMatching.num_threads", str(settings.COLMAP_NUM_THREADS),
+              "--SiftMatching.use_gpu", "1" if has_cuda else "0"], "exhaustive_matcher")
 
     _run_cmd([settings.COLMAP_BIN, "mapper",
               "--database_path", str(db_path),
               "--image_path", str(images_dir),
-              "--output_path", str(sparse_dir)], "mapper")
+              "--output_path", str(sparse_dir),
+              "--Mapper.num_threads", str(settings.COLMAP_NUM_THREADS)], "mapper")
 
     progress_cb("colmap_mvs", 55)
+
+    fused_ply = dense_dir / "fused.ply"
+    if not has_cuda:
+        sparse_model = _find_sparse_model_dir(sparse_dir)
+        if sparse_model:
+            _run_cmd([
+                settings.COLMAP_BIN, "model_converter",
+                "--input_path", str(sparse_model),
+                "--output_path", str(fused_ply),
+                "--output_type", "PLY",
+            ], "model_converter")
+            return fused_ply
 
     _run_cmd([settings.COLMAP_BIN, "image_undistorter",
               "--image_path", str(images_dir),
@@ -171,7 +238,6 @@ def _run_manual_dense(workspace: Path, images_dir: Path, dense_dir: Path, progre
     _run_cmd([settings.COLMAP_BIN, "patch_match_stereo",
               "--workspace_path", str(dense_dir)], "patch_match_stereo")
 
-    fused_ply = dense_dir / "fused.ply"
     _run_cmd([settings.COLMAP_BIN, "stereo_fusion",
               "--workspace_path", str(dense_dir),
               "--output_path", str(fused_ply)], "stereo_fusion")

@@ -21,24 +21,45 @@ Web Dashboard (Three.js + vanilla HTML)
 
 ---
 
-## 🚀 Quick Start (Control Panel)
+## 🚀 Quick Start (Docker Backend)
 
-We have a unified wrapper script called `./run.sh` that makes it incredibly easy to manage the entire backend environment and test the APIs locally without needing an iOS frontend.
+The entire backend (PostgreSQL, Redis, FastAPI, and Celery Worker with **COLMAP, FFmpeg, and Open3D** pre-installed) runs seamlessly in Docker. You do **not** need to manually install COLMAP or PostgreSQL on your Mac.
 
-### 1. Initial Setup
-If you have just cloned the repository, run the setup script to install dependencies (PostgreSQL, Redis, COLMAP, Python packages) and create the database tables.
+Use the `./run.sh` control panel script to manage the lifecycle and test the pipeline:
 
-```bash
-./run.sh setup
-```
+### 1. Start the Backend
 
-### 2. Start the Backend
-To start all services locally (Database, Redis, FastAPI server, and Celery worker), run:
+Start all four backend containers (`db`, `redis`, `api`, `worker`):
 
 ```bash
+# Option A: Run in background (recommended)
+./run.sh start -d
+
+# Option B: Run in foreground (streams logs directly; Ctrl+C stops gracefully)
 ./run.sh start
 ```
-*Note: Keep this terminal open. It will print logs from both the API and the Celery worker. Press `Ctrl+C` to gracefully stop all services.*
+
+### 2. Manage the Backend Containers
+
+```bash
+# View live logs of all services (or specify: worker, api, db, redis)
+./run.sh logs
+./run.sh logs worker
+
+# Check status and health of containers
+./run.sh status
+
+# Restart backend containers
+./run.sh restart
+
+# Stop all backend containers
+./run.sh stop
+```
+
+Once started:
+- **API Docs (Swagger)**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
+- **Web Dashboard**: Open `web_dashboard/index.html` directly in your browser.
 
 ---
 

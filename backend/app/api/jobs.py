@@ -12,6 +12,7 @@ import asyncio
 import json
 from typing import Optional
 
+import redis.asyncio as aioredis
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
@@ -139,31 +140,85 @@ async def websocket_progress(job_id: str, ws: WebSocket, db: AsyncSession = Depe
     The server pushes JSON messages of the form:
         {"stage": "colmap_sfm", "pct": 35}
         {"stage": "complete",   "pct": 100, "result_url": "/jobs/{id}/results"}
-
-    The client should reconnect on disconnect (network blip, etc.).
+        {"stage": "failed",     "pct": 0,   "error": "..."}
     """
-    # Verify job exists before accepting
     job = await _get_or_404(job_id, db)
     await manager.connect(job_id, ws)
 
+    redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    pubsub = redis_client.pubsub()
+    await pubsub.subscribe(f"job:{job_id}:progress")
+
     try:
         # Immediately send current state so client isn't left blank
-        await ws.send_json({"stage": job.status, "pct": job.progress_pct})
+        stage_str = job.status.value if hasattr(job.status, "value") else str(job.status)
+        await ws.send_json({"stage": stage_str, "pct": job.progress_pct})
 
-        # If already complete, send result URL and close
+        # If already complete or failed, send final status and close
         if job.status == JobStatus.complete:
-            await ws.send_json({"stage": "complete", "pct": 100,
-                                "result_url": f"/jobs/{job_id}/results"})
+            await ws.send_json({
+                "stage": "complete",
+                "pct": 100,
+                "result_url": f"/jobs/{job_id}/results",
+            })
+            return
+        elif job.status == JobStatus.failed:
+            await ws.send_json({
+                "stage": "failed",
+                "pct": job.progress_pct,
+                "error": job.error_message or "Pipeline execution failed",
+            })
             return
 
-        # Keep connection alive; real updates come from Celery → broadcast()
-        while True:
+        async def redis_listener():
             try:
-                await asyncio.wait_for(ws.receive_text(), timeout=30)
-            except asyncio.TimeoutError:
-                await ws.send_json({"heartbeat": True})
+                async for message in pubsub.listen():
+                    if message.get("type") == "message":
+                        raw_data = message.get("data")
+                        try:
+                            data = json.loads(raw_data) if isinstance(raw_data, str) else raw_data
+                        except Exception:
+                            data = {"raw": raw_data}
+                        await ws.send_json(data)
+                        if isinstance(data, dict) and data.get("stage") in ("complete", "failed"):
+                            break
+            except asyncio.CancelledError:
+                pass
+
+        async def heartbeat_sender():
+            try:
+                while True:
+                    await asyncio.sleep(30)
+                    await ws.send_json({"heartbeat": True})
+            except asyncio.CancelledError:
+                pass
+
+        redis_task = asyncio.create_task(redis_listener())
+        heartbeat_task = asyncio.create_task(heartbeat_sender())
+
+        # Keep connection alive; process client pings or wait for completion
+        try:
+            while not redis_task.done():
+                try:
+                    await asyncio.wait_for(ws.receive_text(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    pass
+        finally:
+            redis_task.cancel()
+            heartbeat_task.cancel()
+            await asyncio.gather(redis_task, heartbeat_task, return_exceptions=True)
 
     except WebSocketDisconnect:
+        pass
+    except Exception as exc:
+        log.warning("websocket_error", job_id=job_id, error=str(exc))
+    finally:
+        try:
+            await pubsub.unsubscribe(f"job:{job_id}:progress")
+            await pubsub.close()
+            await redis_client.close()
+        except Exception:
+            pass
         manager.disconnect(job_id, ws)
 
 

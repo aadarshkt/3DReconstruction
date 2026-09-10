@@ -27,6 +27,11 @@ const statusBar     = document.getElementById('statusBar');
 const statusText    = document.getElementById('statusText');
 const spinner       = document.getElementById('spinner');
 
+// ── Auto-configure server & query params ─────────────────────────────────────
+if (window.location.protocol.startsWith('http') && window.location.origin && window.location.origin !== 'null') {
+  serverInput.value = window.location.origin;
+}
+
 // ── Three.js state ────────────────────────────────────────────────────────────
 let renderer, scene, camera, controls, animFrameId;
 
@@ -39,9 +44,16 @@ document.querySelectorAll('.tab').forEach(tab => {
     const target = document.getElementById('tab' + capitalize(tab.dataset.tab));
     target?.classList.add('active');
 
-    // Init Three.js when the 3D tab is first shown
-    if (tab.dataset.tab === 'pointcloud' && !renderer) {
-      initThreeJS();
+    // Init or refresh Three.js when the 3D tab is shown
+    if (tab.dataset.tab === 'pointcloud') {
+      if (!renderer) {
+        initThreeJS();
+      } else if (window._pendingPLY) {
+        const { base, jobId, path } = window._pendingPLY;
+        loadPLY(base, jobId, path);
+        window._pendingPLY = null;
+      }
+      setTimeout(onResize, 50);
     }
   });
 });
@@ -49,6 +61,16 @@ document.querySelectorAll('.tab').forEach(tab => {
 // ── Load results ──────────────────────────────────────────────────────────────
 loadBtn.addEventListener('click', loadResults);
 jobIdInput.addEventListener('keydown', e => { if (e.key === 'Enter') loadResults(); });
+
+// Check URL query parameters for auto-loading (?job_id=...)
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const qJobId = params.get('job_id') || params.get('jobId');
+  if (qJobId) {
+    jobIdInput.value = qJobId;
+    loadResults();
+  }
+});
 
 async function loadResults() {
   const jobId = jobIdInput.value.trim();
@@ -60,7 +82,15 @@ async function loadResults() {
   try {
     // Fetch result JSON
     const res = await fetch(`${base}/jobs/${jobId}/results`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+    if (!res.ok) {
+      const errText = await res.text();
+      let msg = errText;
+      try {
+        const parsed = JSON.parse(errText);
+        msg = parsed.detail || errText;
+      } catch (_) {}
+      throw new Error(`HTTP ${res.status}: ${msg}`);
+    }
     const data = await res.json();
 
     renderSummary(data);
@@ -88,7 +118,8 @@ async function loadResults() {
 // ── Summary ───────────────────────────────────────────────────────────────────
 function renderSummary(data) {
   document.getElementById('statArea').textContent =
-    data.room_area_m2 ? `${data.room_area_m2.toFixed(1)} m²` : '—';
+    (data.room_area_m2 !== undefined && data.room_area_m2 !== null)
+      ? `${Number(data.room_area_m2).toFixed(1)} m²` : '—';
   document.getElementById('statWalls').textContent = data.wall_count ?? '—';
   document.getElementById('statError').textContent =
     data.error_estimate ? `≈ ${data.error_estimate.expected_wall_error_cm} cm` : '—';
@@ -101,6 +132,10 @@ function renderSummary(data) {
 // ── Wall table ────────────────────────────────────────────────────────────────
 function renderWallTable(walls) {
   wallTableBody.innerHTML = '';
+  if (!walls || walls.length === 0) {
+    wallsCard.classList.add('hidden');
+    return;
+  }
   walls.forEach(w => {
     const tr = document.createElement('tr');
     const openingTag = w.has_opening && w.opening_type
@@ -127,7 +162,10 @@ function renderDownloads(base, jobId, files) {
     const a = document.createElement('a');
     a.className = 'btn btn-download';
     a.href = `${base}/jobs/${jobId}/files/${filename}`;
-    a.download = filename;
+    a.target = '_blank';
+    if (key !== 'floor_plan_svg') {
+      a.download = filename;
+    }
     a.innerHTML = `<span class="icon">${icon}</span><span>${label}</span>`;
     downloadList.appendChild(a);
   });
@@ -142,6 +180,14 @@ async function renderSVG(base, jobId, svgPath) {
 
   try {
     const res  = await fetch(svgURL);
+    if (!res.ok) {
+      console.warn(`SVG fetch failed with status ${res.status}`);
+      svgContainer.innerHTML = `
+        <div class="placeholder-message">
+          <p>SVG floor plan preview unavailable (HTTP ${res.status})</p>
+        </div>`;
+      return;
+    }
     const text = await res.text();
     svgContainer.innerHTML = text;
 
@@ -153,6 +199,10 @@ async function renderSVG(base, jobId, svgPath) {
     }
   } catch (e) {
     console.warn('SVG load failed:', e);
+    svgContainer.innerHTML = `
+      <div class="placeholder-message">
+        <p>Could not load SVG preview: ${e.message}</p>
+      </div>`;
   }
 }
 

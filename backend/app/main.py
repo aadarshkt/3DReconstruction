@@ -52,6 +52,9 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
+from fastapi import Request
+from fastapi.responses import RedirectResponse
+
 # ── App ────────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title=settings.APP_NAME,
@@ -67,8 +70,8 @@ app = FastAPI(
 # ── CORS (needed for iOS WKWebView and web dashboard) ─────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -78,7 +81,19 @@ app.include_router(jobs_router.router,    prefix="/jobs",    tags=["Jobs"])
 app.include_router(uploads_router.router, prefix="/jobs",    tags=["Uploads"])
 app.include_router(results_router.router, prefix="/jobs",    tags=["Results"])
 
-# ── Static files (result DXF / SVG / PLY served directly) ─────────────────────
+# ── Dashboard & Static files ──────────────────────────────────────────────────
+dashboard_dir = Path("/app/web_dashboard")
+if not dashboard_dir.exists():
+    dashboard_dir = Path(__file__).resolve().parent.parent.parent / "web_dashboard"
+
+if dashboard_dir.exists():
+    app.mount("/dashboard", StaticFiles(directory=str(dashboard_dir), html=True), name="dashboard")
+
+    @app.get("/", include_in_schema=False)
+    async def root_redirect(request: Request):
+        query = f"?{request.url.query}" if request.url.query else ""
+        return RedirectResponse(url=f"/dashboard/{query}")
+
 settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(settings.DATA_DIR)), name="static")
 

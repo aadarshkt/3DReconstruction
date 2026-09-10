@@ -130,6 +130,7 @@ async def download_file(job_id: str, filename: str, db: AsyncSession = Depends(g
         path=str(target),
         media_type=media_type,
         filename=filename,
+        content_disposition_type="inline" if target.suffix in (".svg", ".json", ".csv") else "attachment",
     )
 
 

@@ -1,53 +1,40 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────────────
-# start_all.sh — Start the FloorPlan Pipeline Backend Services
+# start_all.sh — Start the FloorPlan Pipeline Backend Services in Docker
 # ──────────────────────────────────────────────────────────────────────────────
 set -e
 
-echo "🐳  Ensuring Docker services (PostgreSQL + Redis) are running..."
-cd "$(dirname "$0")/backend"
-docker-compose up -d db redis
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/backend"
 
-echo "⏳  Waiting for PostgreSQL..."
-until docker-compose exec -T db pg_isready -U floorplan 2>/dev/null; do
-  sleep 1
-done
-
-echo "🐍  Activating virtual environment..."
-if [ -f "../.venv/bin/activate" ]; then
-  source ../.venv/bin/activate
-elif [ -f ".venv/bin/activate" ]; then
-  source .venv/bin/activate
-else
-  echo "❌ Error: Could not find .venv/bin/activate!"
-  exit 1
+DETACHED=false
+if [ "$1" = "-d" ] || [ "$1" = "--detached" ]; then
+    DETACHED=true
 fi
 
-# Function to clean up background processes on exit
-cleanup() {
+echo "🐳  Starting Docker backend stack (PostgreSQL, Redis, FastAPI, Celery + COLMAP)..."
+
+if [ "$DETACHED" = true ]; then
+    docker compose up -d --build
     echo ""
-    echo "🛑  Stopping backend services..."
-    kill $UVICORN_PID $CELERY_PID 2>/dev/null || true
-    wait
-    echo "✅  Stopped gracefully."
-    exit 0
-}
-trap cleanup SIGINT SIGTERM
+    echo "========================================================"
+    echo "✅  All services running in background (Docker)!"
+    echo "    - API Docs:   http://localhost:8000/docs"
+    echo "    - Dashboard:  http://localhost:8000"
+    echo "    - View logs:  ./run.sh logs"
+    echo "    - Stop stack: ./run.sh stop"
+    echo "========================================================"
+else
+    cleanup() {
+        echo ""
+        echo "🛑  Stopping backend containers..."
+        docker compose stop
+        echo "✅  Stopped gracefully."
+        exit 0
+    }
+    trap cleanup SIGINT SIGTERM
 
-echo "🚀  Starting FastAPI Server (port 8000)..."
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload &
-UVICORN_PID=$!
-
-echo "🚀  Starting Celery Worker..."
-celery -A app.tasks.celery_tasks worker --loglevel=info &
-CELERY_PID=$!
-
-echo ""
-echo "========================================================"
-echo "✅  All services running!"
-echo "    - API Docs: http://localhost:8000/docs"
-echo "    - Dashboard: open ../web_dashboard/index.html"
-echo "    Press Ctrl+C to stop the servers."
-echo "========================================================"
-
-wait
+    echo "    (Press Ctrl+C to stop the containers)"
+    echo ""
+    docker compose up --build
+fi

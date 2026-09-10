@@ -146,6 +146,19 @@ def _export_svg(walls: list[WallSegment], out: Path):
     """
     if not walls:
         log.warning("svg_export_no_walls")
+        dwg = svgwrite.Drawing(str(out), size=("600px", "400px"))
+        dwg.add(dwg.rect(insert=(0, 0), size=("100%", "100%"), fill="#0f1117", rx=8, ry=8))
+        dwg.add(dwg.text("Floor Plan Preview", insert=(300, 160),
+                         font_size="20px", font_family=SVG_FONT,
+                         font_weight="bold", fill="#e2e8f0", text_anchor="middle"))
+        dwg.add(dwg.text("No wall segments detected in reconstruction", insert=(300, 200),
+                         font_size="14px", font_family=SVG_FONT,
+                         fill="#94a3b8", text_anchor="middle"))
+        dwg.add(dwg.text("Check the 3D Point Cloud tab to view reconstructed points", insert=(300, 230),
+                         font_size="12px", font_family=SVG_FONT,
+                         fill="#6366f1", text_anchor="middle"))
+        dwg.save()
+        log.info("svg_saved_placeholder", path=str(out))
         return
 
     # Compute bounding box

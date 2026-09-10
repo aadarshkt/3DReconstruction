@@ -31,6 +31,8 @@ class Settings(BaseSettings):
 
     # ── COLMAP ────────────────────────────────────────────────────────────────
     COLMAP_BIN: str = "colmap"             # path to COLMAP binary
+    COLMAP_NUM_THREADS: int = 2           # limit CPU threads to prevent memory exhaustion / OOM
+    COLMAP_QUALITY: str = "medium"        # quality preset: low, medium, high, extreme
 
     # ── Pipeline defaults ─────────────────────────────────────────────────────
     VIDEO_EXTRACT_FPS: float = 3.0        # frames/sec to extract from video

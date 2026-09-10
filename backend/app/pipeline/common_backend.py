@@ -79,10 +79,24 @@ def extract_structural_elements(
     progress_cb("plane_extraction", 60)
 
     pcd = o3d.io.read_point_cloud(str(ply_path))
-    log.info("pcd_loaded", n_points=len(pcd.points))
+    n_pts = len(pcd.points)
+    log.info("pcd_loaded", n_points=n_pts)
+
+    if n_pts < 50:
+        raise ValueError(
+            f"Reconstructed point cloud is too sparse ({n_pts} points, minimum 50 required). "
+            "Check camera overlap, lighting, and ensure sufficient baseline parallax."
+        )
 
     # ── 1. Remove statistical outliers ───────────────────────────────────────
-    pcd, _ = pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
+    if len(pcd.points) >= 20:
+        pcd, _ = pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
+
+    if len(pcd.points) < 10:
+        raise ValueError(
+            f"Point cloud is too sparse after outlier removal ({len(pcd.points)} points remaining). "
+            "Check camera overlap, lighting, and ensure sufficient baseline parallax."
+        )
 
     points = np.asarray(pcd.points)
 
@@ -153,6 +167,9 @@ def _extract_plane(
     Returns (plane_model, inlier_cloud, outlier_cloud).
     plane_model is [a, b, c, d] for ax+by+cz+d=0.
     """
+    if len(cloud.points) < 3:
+        return np.array([0.0, 0.0, 1.0, 0.0]), o3d.geometry.PointCloud(), cloud
+
     model, inliers = cloud.segment_plane(
         distance_threshold=dist_thresh,
         ransac_n=3,

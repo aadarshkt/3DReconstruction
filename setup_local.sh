@@ -7,7 +7,7 @@ set -e
 echo "📦  Installing Homebrew dependencies…"
 brew install colmap ffmpeg postgresql@16 redis || true
 
-echo "🐳  Starting Docker services (PostgreSQL + Redis via docker-compose)…"
+echo "🐳  Starting Docker services (PostgreSQL + Redis via docker compose)…"
 cd "$(dirname "$0")/backend"
 
 # Copy env if not present
@@ -17,11 +17,11 @@ if [ ! -f .env ]; then
 fi
 
 # Start only the DB and Redis (not the API — we run that locally below)
-docker-compose up -d db redis
+docker compose up -d db redis
 
 echo "⏳  Waiting for PostgreSQL to be ready…"
 sleep 5
-until docker-compose exec -T db pg_isready -U floorplan 2>/dev/null; do
+until docker compose exec -T db pg_isready -U floorplan 2>/dev/null; do
   sleep 1
 done
 

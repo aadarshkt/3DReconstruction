@@ -1,5 +1,3 @@
-version: "3.9"
-
 # ── Services ──────────────────────────────────────────────────────────────────
 services:
 
@@ -56,7 +54,8 @@ services:
       DATA_DIR: /app/data
     volumes:
       - ./app:/app/app
-      - job_data:/app/data
+      - ../web_dashboard:/app/web_dashboard
+      - ./data:/app/data
     ports:
       - "8000:8000"
     command: >
@@ -83,10 +82,9 @@ services:
       DATA_DIR: /app/data
     volumes:
       - ./app:/app/app
-      - job_data:/app/data
-    command: celery -A app.tasks.celery_tasks worker --loglevel=info --concurrency=2
+      - ./data:/app/data
+    command: celery -A app.tasks.celery_tasks worker --loglevel=info --concurrency=1
 
 # ── Volumes ───────────────────────────────────────────────────────────────────
 volumes:
   postgres_data:
-  job_data:
