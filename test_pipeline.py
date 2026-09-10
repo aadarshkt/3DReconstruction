@@ -40,10 +40,42 @@ def main():
     parser = argparse.ArgumentParser(description="Test 3D Reconstruction Pipeline API")
     parser.add_argument("--tier", choices=["photos", "video", "lidar", "hybrid"], required=True, help="Capture tier")
     parser.add_argument("--scale", type=float, help="Scale reference in meters (required for photos/video)")
-    parser.add_argument("--files", nargs="+", required=True, help="File(s) to upload (.mp4, .jpg, .json, etc.)")
+    parser.add_argument("--files", nargs="+", required=True, help="File(s) or directory of files to upload (.mp4, .jpg, .json, image folder, etc.)")
     args = parser.parse_args()
 
-    # 1. Create Job
+    # 1. Resolve Files / Directories (Validate before creating job)
+    expanded_files = []
+    VALID_IMG_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".tif", ".heic"}
+    
+    for fpath in args.files:
+        if not os.path.exists(fpath):
+            print(f"[!] Path not found: {fpath}")
+            sys.exit(1)
+        if os.path.isdir(fpath):
+            dir_files = []
+            for root, _, filenames in os.walk(fpath):
+                for fname in sorted(filenames):
+                    if fname.startswith("."):
+                        continue
+                    ext = os.path.splitext(fname)[1].lower()
+                    if args.tier in ("photos", "hybrid"):
+                        if ext in VALID_IMG_EXTS:
+                            dir_files.append(os.path.join(root, fname))
+                    else:
+                        dir_files.append(os.path.join(root, fname))
+            if not dir_files:
+                print(f"[!] No valid files found in directory: {fpath}")
+                sys.exit(1)
+            print(f"[*] Discovered {len(dir_files)} file(s) in directory '{fpath}'")
+            expanded_files.extend(dir_files)
+        else:
+            expanded_files.append(fpath)
+
+    if not expanded_files:
+        print("[!] No files found to upload.")
+        sys.exit(1)
+
+    # 2. Create Job
     payload = {"tier": args.tier}
     if args.scale is not None:
         payload["scale_reference_m"] = args.scale
@@ -57,17 +89,13 @@ def main():
     job_id = r.json()["job_id"]
     print(f"[+] Job Created: {job_id}")
 
-    # 2. Upload Files
-    print(f"[*] Uploading {len(args.files)} file(s)...")
+    # 3. Upload Files
+    print(f"[*] Uploading {len(expanded_files)} file(s)...")
     files_to_upload = []
     file_handles = []
     
     try:
-        for fpath in args.files:
-            if not os.path.exists(fpath):
-                print(f"[!] File not found: {fpath}")
-                sys.exit(1)
-            
+        for fpath in expanded_files:
             # Keep file handles open during the request
             fh = open(fpath, "rb")
             file_handles.append(fh)

@@ -82,6 +82,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -120,6 +122,7 @@ Icon
 data/
 outputs/
 models/
+south-building/
 *.ckpt
 *.pt
 *.pth

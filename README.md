@@ -21,26 +21,64 @@ Web Dashboard (Three.js + vanilla HTML)
 
 ---
 
-## Quick Start (Local, macOS)
+## 🚀 Quick Start (Control Panel)
+
+We have a unified wrapper script called `./run.sh` that makes it incredibly easy to manage the entire backend environment and test the APIs locally without needing an iOS frontend.
+
+### 1. Initial Setup
+If you have just cloned the repository, run the setup script to install dependencies (PostgreSQL, Redis, COLMAP, Python packages) and create the database tables.
 
 ```bash
-# 1. Clone and bootstrap
-chmod +x setup_local.sh && ./setup_local.sh
-
-# 2. Start FastAPI server
-cd backend && source .venv/bin/activate
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-# 3. Start Celery worker (new terminal)
-cd backend && source .venv/bin/activate
-celery -A app.tasks.celery_tasks worker --loglevel=info
-
-# 4. Open web dashboard
-open web_dashboard/index.html
-
-# 5. API docs / Swagger UI
-open http://localhost:8000/docs
+./run.sh setup
 ```
+
+### 2. Start the Backend
+To start all services locally (Database, Redis, FastAPI server, and Celery worker), run:
+
+```bash
+./run.sh start
+```
+*Note: Keep this terminal open. It will print logs from both the API and the Celery worker. Press `Ctrl+C` to gracefully stop all services.*
+
+---
+
+## 🧪 Testing the Pipeline (End-to-End)
+
+Once your backend is running, you can open a **new terminal window** and use the test commands to simulate exactly what the iOS app does. 
+
+### Tier A: Photos
+Submit 25-40 overlapping `.jpg` photos. You must provide a **scale reference** (in meters) representing the length of a known object in the scene. You can supply either an entire folder of images or individual files:
+```bash
+# Option 1: Pass an image folder (Recommended)
+./run.sh test photos 0.297 ./my_room_photos/
+
+# Option 2: Pass individual image files
+./run.sh test photos 0.297 img1.jpg img2.jpg img3.jpg
+```
+
+### Tier B: Video
+Submit a single `.mp4` or `.mov` walkthrough video. Requires a **scale reference** in meters.
+```bash
+./run.sh test video 1.0 my_room_scan.mp4
+```
+
+### Tier C: LiDAR (RoomPlan)
+Submit an Apple RoomPlan `.json` or `.usdz` export. Because LiDAR is natively scaled in meters, **no scale argument is required**.
+```bash
+./run.sh test lidar my_room.json
+```
+
+### Hybrid Fusion (Video + LiDAR)
+Submit both COLMAP data (Video/Photos) and LiDAR data. The backend will intelligently run both pipelines and fuse them using Iterative Closest Point (ICP), taking the perfect scale from LiDAR and the photorealism from the video.
+```bash
+./run.sh test hybrid my_room.json my_video.mp4
+```
+
+---
+
+## 📊 Viewing the Results
+
+When a test script finishes successfully, open `web_dashboard/index.html` in your browser. Enter the **Job ID** provided at the end of the test script output to view the 3D Point Cloud and the 2D SVG floor plan.
 
 ---
 
