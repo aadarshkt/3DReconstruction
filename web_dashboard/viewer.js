@@ -39,10 +39,16 @@ let renderer, scene, camera, controls, animFrameId;
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => {
+      c.classList.remove('active');
+      c.classList.add('hidden');
+    });
     tab.classList.add('active');
     const target = document.getElementById('tab' + capitalize(tab.dataset.tab));
-    target?.classList.add('active');
+    if (target) {
+      target.classList.add('active');
+      target.classList.remove('hidden');
+    }
 
     // Init or refresh Three.js when the 3D tab is shown
     if (tab.dataset.tab === 'pointcloud') {
