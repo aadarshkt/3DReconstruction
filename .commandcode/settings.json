@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(python3 - <<'PY' import enum, math class Tier(str, enum.Enum): photos=\"photos\" print(\"str(Tier.photos) ->\", repr(str(Tier.photos))) def _angle_diff(a,b): return (a-b+math.pi)%math.pi - math.pi/2 for a,b in [(0,0),(0,1.5708),(0.1,0),(1.6,1.5708)]: print(f\"diff({a},{b}) = {_angle_diff(a,b):.4f}\") PY)",
+      "Shell(cd /Users/aadarshkt/Desktop/3DReconstruction && echo \"=== root zips/dirs ===\" && ls -lh graham-hall.z05 gerrard-hall.zip 2>/dev/null; echo \"=== gerrard-hall ===\" && find gerrard-hall -maxdepth 2 | head -30; echo \"=== extracted_frames ===\" && ls extracted_frames | head; echo \"=== data ===\" && find data -maxdepth 3 | head -30)"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}

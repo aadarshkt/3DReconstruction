@@ -269,8 +269,10 @@ def _compute_error_estimate(scale_confidence: str) -> dict:
     """Return a heuristic error estimate based on the capture tier."""
     if scale_confidence == "native_metric":
         return {"method": "lidar_native", "expected_wall_error_cm": 2.5}
-    else:
+    elif scale_confidence == "scaled_via_reference":
         return {"method": "scale_propagation", "expected_wall_error_cm": 5.0}
+    else:
+        return {"method": "unscaled_sfm", "expected_wall_error_cm": None}
 
 
 # ── Validation CSV ────────────────────────────────────────────────────────────

@@ -48,7 +48,7 @@ async def monitor_progress(job_id):
 def main():
     parser = argparse.ArgumentParser(description="Test 3D Reconstruction Pipeline API")
     parser.add_argument("--tier", choices=["photos", "video", "lidar", "hybrid"], required=True, help="Capture tier")
-    parser.add_argument("--scale", type=float, help="Scale reference in meters (required for photos/video)")
+    parser.add_argument("--scale", type=float, help="Scale reference in meters (optional for photos/video; defaults to 1.0m)")
     parser.add_argument("--stride", "--step", type=int, default=1, help="Subsample image frequency (e.g., 8 takes every 8th image)")
     parser.add_argument("--files", nargs="+", required=True, help="File(s) or directory of files to upload (.mp4, .jpg, .json, image folder, etc.)")
     args = parser.parse_args()

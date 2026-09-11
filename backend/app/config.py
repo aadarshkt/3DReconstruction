@@ -38,8 +38,10 @@ class Settings(BaseSettings):
     VIDEO_EXTRACT_FPS: float = 3.0        # frames/sec to extract from video
     RANSAC_DISTANCE_THRESH: float = 0.02  # metres, for plane fitting
     MIN_WALL_POINTS: int = 300            # discard planes with fewer inliers
-    WALL_SLICE_Z_MIN: float = 1.0         # horizontal slice band for wall fitting
+    WALL_SLICE_Z_MIN: float = 1.0         # fallback absolute slice band (m above floor)
     WALL_SLICE_Z_MAX: float = 1.5
+    WALL_SLICE_REL_MIN: float = 0.25      # relative slice band: 25% of wall height above floor
+    WALL_SLICE_REL_MAX: float = 0.75      # relative slice band: 75% of wall height above floor
 
     # ── CORS ─────────────────────────────────────────────────────────────────
     # Add mobile app origins and local dashboard here

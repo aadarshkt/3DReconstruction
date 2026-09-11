@@ -71,8 +71,9 @@ class CreateJobRequest(BaseModel):
     scale_reference_m: Optional[float] = Field(
         None,
         description=(
-            "Real-world length in metres of the reference object visible in the "
-            "capture. Required for Tier A (photos) and Tier B (video). "
+            "Real-world length in metres of a reference object (or dimension) visible in the "
+            "capture. Optional for Tier A (photos) and Tier B (video). "
+            "If omitted, reconstruction proceeds in unscaled SfM units. "
             "Omit for Tier C (LiDAR — natively metric)."
         ),
         gt=0,
@@ -100,16 +101,6 @@ async def create_job(body: CreateJobRequest, db: AsyncSession = Depends(get_db))
     The client should then upload files via POST /jobs/{job_id}/upload,
     then trigger processing with POST /jobs/{job_id}/start.
     """
-    if body.tier in (Tier.photos, Tier.video) and body.scale_reference_m is None:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "scale_reference_m is required for photo and video tiers. "
-                "Measure the real-world length (m) of a reference object "
-                "visible in at least 2 frames."
-            ),
-        )
-
     job = Job(tier=body.tier, scale_reference_m=body.scale_reference_m)
     db.add(job)
     await db.commit()

@@ -68,20 +68,44 @@ Once started:
 Once your backend is running, you can open a **new terminal window** and use the test commands to simulate exactly what the iOS app does. 
 
 ### Tier A: Photos
-Submit 25-40 overlapping `.jpg` photos. You must provide a **scale reference** (in meters) representing the length of a known object in the scene. You can supply either an entire folder of images or individual files:
+Submit 25-40 overlapping `.jpg` photos. Provide an optional **scale reference** in meters representing a known dimension or reference object in the scene (defaults to `1.0` m if omitted):
 ```bash
-# Option 1: Pass an image folder (Recommended)
-./run.sh test photos 0.297 ./my_room_photos/
+# Option 1: Pass an image folder with default scale (1.0m)
+./run.sh test photos ./my_room_photos/
 
-# Option 2: Pass individual image files
-./run.sh test photos 0.297 img1.jpg img2.jpg img3.jpg
+# Option 2: Provide a specific reference scale (e.g. 0.82m door width)
+./run.sh test photos 0.82 ./my_room_photos/
+
+# Option 3: Pass individual image files
+./run.sh test photos 0.82 img1.jpg img2.jpg img3.jpg
 ```
 
 ### Tier B: Video
-Submit a single `.mp4` or `.mov` walkthrough video. Requires a **scale reference** in meters.
+Submit a single `.mp4` or `.mov` walkthrough video. Provide an optional **scale reference** in meters (defaults to `1.0` m if omitted):
 ```bash
-./run.sh test video 1.0 my_room_scan.mp4
+# Option 1: Default scale (1.0m)
+./run.sh test video my_room_scan.mp4
+
+# Option 2: Specify reference scale (e.g. 3.2m story height for building)
+./run.sh test video 3.2 building_facade.mp4
 ```
+
+### 📏 Scale Reference Guidelines (Indoor Rooms vs. Outdoor Buildings)
+
+Because SfM point clouds are unit-less without LiDAR, providing an accurate reference measurement anchors the 3D model and 2D floor plan to real-world metric dimensions:
+
+| Scene Type | Recommended Reference | Typical Real-World Length (m) | Why Use It |
+|---|---|---|---|
+| **Indoor Room** | **Interior Door Width** | `0.82` m (range: `0.80`–`0.90` m) | Visible in almost every room; highly standardized. |
+| **Indoor Room** | **Door Frame Height** | `2.05` m (range: `2.00`–`2.10` m) | Clear vertical reference from floor to lintel. |
+| **Indoor Room** | **1-Metre Stick / Tape** | `1.00` m | Placed on the floor or leaned against a wall for precision. |
+| **Indoor Room** | **Desk / Counter Height** | `0.75`–`0.90` m | Good secondary height reference. |
+| **Indoor Room** | *A4 Paper (Caution)* | `0.297` m | *Only for tabletop scans*. In full rooms, A4 paper covers too few pixels to provide stable scale. |
+| **Outdoor Building** | **Entrance Doorway** | `0.90`–`1.00` m width / `2.10`–`2.40` m height | Standard entrance dimensions across architectural eras. |
+| **Outdoor Building** | **Single Story Height** | `3.00`–`3.50` m | Floor-to-floor height on historic/academic buildings (e.g. Gerrard Hall). |
+| **Outdoor Building** | **Facade Window Width** | `1.20`–`1.80` m | Highly visible across exterior walk-arounds. |
+| **Outdoor Building** | **Column Spacing / Base** | Known architectural width (e.g. `4.0`–`12.0` m) | Measure via site tape measure, architectural drawings, or satellite maps. |
+| **Any / Quick Test** | **Default Scale** | `1.00` m | Automatically used when no scale argument is passed to `./run.sh`. |
 
 ### Tier C: LiDAR (RoomPlan)
 Submit an Apple RoomPlan `.json` or `.usdz` export. Because LiDAR is natively scaled in meters, **no scale argument is required**.

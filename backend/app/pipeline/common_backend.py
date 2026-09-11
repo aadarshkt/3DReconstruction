@@ -105,51 +105,83 @@ def extract_structural_elements(
 
     # ── 3. RANSAC plane extraction loop ──────────────────────────────────────
     working_cloud = pcd
-    extracted_planes: list[tuple[np.ndarray, o3d.geometry.PointCloud]] = []
-
-    # Extract floor (largest horizontal plane first)
-    floor_model, floor_cloud, working_cloud = _extract_plane(working_cloud, dist_thresh=0.02)
-    ceiling_model, ceiling_cloud, working_cloud = _extract_plane(working_cloud, dist_thresh=0.02)
-
-    log.info("floor_ceiling_extracted",
-             floor_pts=len(floor_cloud.points),
-             ceiling_pts=len(ceiling_cloud.points),
-             remainder_pts=len(working_cloud.points))
-
-    # Extract walls (iterative)
+    horizontal_planes: list[tuple[np.ndarray, o3d.geometry.PointCloud, float]] = []  # (model, cloud, median_z)
     raw_walls: list[tuple[np.ndarray, o3d.geometry.PointCloud]] = []
-    max_wall_iterations = 20
 
-    for _ in range(max_wall_iterations):
-        if len(working_cloud.points) < settings.MIN_WALL_POINTS:
+    min_plane_pts = min(settings.MIN_WALL_POINTS, max(50, len(points) // 50))
+    max_plane_iterations = 25
+
+    for i in range(max_plane_iterations):
+        if len(working_cloud.points) < min_plane_pts:
             break
-        model, wall_cloud, working_cloud = _extract_plane(
+        model, inlier_cloud, working_cloud = _extract_plane(
             working_cloud, dist_thresh=settings.RANSAC_DISTANCE_THRESH
         )
-        if len(wall_cloud.points) < settings.MIN_WALL_POINTS:
+        if len(inlier_cloud.points) < min_plane_pts:
             break
-        # Filter: walls are vertical (normal nearly horizontal)
+
         normal = np.array(model[:3])
-        if abs(normal[2]) < 0.85:  # Z-component < 0.85 → not floor/ceiling
-            raw_walls.append((model, wall_cloud))
-        log.debug("wall_plane_extracted", n_pts=len(wall_cloud.points),
-                  normal=normal.tolist())
+        norm_len = np.linalg.norm(normal)
+        if norm_len > 1e-6:
+            normal = normal / norm_len
+
+        pts_plane = np.asarray(inlier_cloud.points)
+        median_z = float(np.median(pts_plane[:, 2]))
+
+        # Normal z-component:
+        # |normal[2]| >= 0.80 -> horizontal plane (floor or ceiling candidate)
+        # |normal[2]| < 0.70  -> vertical wall candidate
+        if abs(normal[2]) >= 0.80:
+            horizontal_planes.append((model, inlier_cloud, median_z))
+            log.info("horizontal_plane_found", idx=i, pts=len(pts_plane), normal=normal.tolist(), median_z=round(median_z, 3))
+        elif abs(normal[2]) < 0.70:
+            raw_walls.append((model, inlier_cloud))
+            log.info("wall_plane_found", idx=i, pts=len(pts_plane), normal=normal.tolist(), median_z=round(median_z, 3))
+        else:
+            log.info("slanted_plane_skipped", idx=i, pts=len(pts_plane), normal=normal.tolist())
+
+    pts_all = np.asarray(pcd.points)
+    floor_cloud: Optional[o3d.geometry.PointCloud] = None
+    ceiling_cloud: Optional[o3d.geometry.PointCloud] = None
+
+    if horizontal_planes:
+        # Sort horizontal planes by median Z: lowest is floor, highest is ceiling
+        horizontal_planes.sort(key=lambda x: x[2])
+        floor_model, floor_cloud, floor_z = horizontal_planes[0]
+        if len(horizontal_planes) > 1:
+            ceiling_model, ceiling_cloud, ceiling_z = horizontal_planes[-1]
+            if ceiling_z <= floor_z:
+                ceiling_z = float(np.percentile(pts_all[:, 2], 95))
+        else:
+            ceiling_z = float(np.percentile(pts_all[:, 2], 95))
+    else:
+        floor_z = float(np.percentile(pts_all[:, 2], 5))
+        ceiling_z = float(np.percentile(pts_all[:, 2], 95))
+
+    log.info(
+        "floor_ceiling_identified",
+        floor_pts=len(floor_cloud.points) if floor_cloud else 0,
+        ceiling_pts=len(ceiling_cloud.points) if ceiling_cloud else 0,
+        floor_z=round(floor_z, 3),
+        ceiling_z=round(ceiling_z, 3),
+        wall_count=len(raw_walls),
+    )
 
     progress_cb("vectorizing", 75)
 
     # ── 4. Vectorize walls → 2D line segments ─────────────────────────────────
-    wall_segments = _vectorize_walls(raw_walls)
+    wall_segments = _vectorize_walls(raw_walls, floor_z=floor_z, ceiling_z=ceiling_z)
 
     # ── 5. Snap to dominant orthogonal axes ──────────────────────────────────
     wall_segments = _snap_orthogonal(wall_segments)
 
     # ── 6. Detect openings ────────────────────────────────────────────────────
-    floor_z = _estimate_floor_z(np.asarray(floor_cloud.points))
+    floor_z_val = _estimate_floor_z(np.asarray(floor_cloud.points)) if floor_cloud and len(floor_cloud.points) > 0 else floor_z
     for seg in wall_segments:
         # Find the plane cloud for this segment
         plane_pts = _get_wall_cloud_for_segment(seg, raw_walls)
         if plane_pts is not None:
-            seg.openings = _detect_openings(seg, plane_pts, floor_z)
+            seg.openings = _detect_openings(seg, plane_pts, floor_z_val)
 
     log.info("extraction_complete", wall_count=len(wall_segments))
     progress_cb("vectorizing", 88)
@@ -183,20 +215,41 @@ def _extract_plane(
 # ── Wall vectorization ────────────────────────────────────────────────────────
 def _vectorize_walls(
     raw_walls: list[tuple[np.ndarray, o3d.geometry.PointCloud]],
+    floor_z: float,
+    ceiling_z: float,
 ) -> list[WallSegment]:
     """
-    For each RANSAC wall plane, project its inliers onto the horizontal slice
-    (z = WALL_SLICE_Z_MIN … WALL_SLICE_Z_MAX) and fit a 2D line.
+    For each RANSAC wall plane, project its inliers onto a horizontal slice band
+    derived adaptively from scene/floor height, and fit a 2D line.
     """
     segments: list[WallSegment] = []
+    height = max(0.1, ceiling_z - floor_z)
+    rel_min = getattr(settings, "WALL_SLICE_REL_MIN", 0.25)
+    rel_max = getattr(settings, "WALL_SLICE_REL_MAX", 0.75)
+
+    global_z_min = floor_z + rel_min * height
+    global_z_max = floor_z + rel_max * height
 
     for idx, (model, cloud) in enumerate(raw_walls):
         pts = np.asarray(cloud.points)
+        if len(pts) == 0:
+            continue
 
-        # Horizontal slice (eye-level band)
-        mask = (pts[:, 2] >= settings.WALL_SLICE_Z_MIN) & \
-               (pts[:, 2] <= settings.WALL_SLICE_Z_MAX)
+        # Relative horizontal slice (e.g. 25%-75% of scene height above floor)
+        mask = (pts[:, 2] >= global_z_min) & (pts[:, 2] <= global_z_max)
         slice_pts = pts[mask]
+
+        # If global slice has insufficient points (e.g. partial wall or steps),
+        # fall back to wall-local adaptive slice (middle 60% of this wall)
+        if len(slice_pts) < 10:
+            w_min = float(pts[:, 2].min())
+            w_max = float(pts[:, 2].max())
+            w_h = w_max - w_min
+            if w_h > 0.05:
+                loc_mask = (pts[:, 2] >= w_min + 0.20 * w_h) & (pts[:, 2] <= w_min + 0.80 * w_h)
+                slice_pts = pts[loc_mask]
+            else:
+                slice_pts = pts
 
         if len(slice_pts) < 10:
             log.warning("wall_slice_too_sparse", idx=idx, n=len(slice_pts))
@@ -216,7 +269,7 @@ def _vectorize_walls(
             x0, x1 = slope * y0 + intercept, slope * y1 + intercept
 
         length = math.dist((x0, y0), (x1, y1))
-        if length < 0.3:   # ignore tiny slivers < 30 cm
+        if length < 0.15:   # ignore tiny slivers < 15 cm
             continue
 
         # Wall face normal (in 2D): perpendicular to the wall direction

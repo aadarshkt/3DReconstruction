@@ -269,17 +269,11 @@ def _apply_scale(job_id: str, raw_ply: Path, scale_reference_m: Optional[float])
     points = np.asarray(pcd.points)
 
     if scale_reference_m is None:
-        # LiDAR: already metric
+        # Unscaled / relative SfM units
         scale_factor = 1.0
-        confidence = "native_metric"
+        confidence = "unscaled"
     else:
-        # Estimate the reconstructed length of the reference object:
-        # We pick the bounding-box diagonal as a proxy for the reconstructed scale.
-        # In a proper implementation, the user marks two points in the viewer.
-        # For the MVP: assume the bounding-box longest axis ≈ the room longest wall,
-        # which should be ~4-6 m for a typical indoor room.
-        # The actual scale anchoring UI (in the iOS app) will send the measured
-        # reconstructed_reference_length_units value; hardcode 1.0 here as placeholder.
+        # User supplied a reference measurement
         reconstructed_ref_units = 1.0   # PLACEHOLDER — replaced by iOS measurement UI
         scale_factor = scale_reference_m / reconstructed_ref_units
         confidence = "scaled_via_reference"

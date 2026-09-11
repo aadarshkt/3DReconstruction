@@ -124,7 +124,12 @@ def run_pipeline(self, job_id: str):
         progress("exporting", 90)
         results_dir = get_results_dir(job_id)
 
-        scale_confidence = "native_metric" if tier == Tier.lidar else "scaled_via_reference"
+        if tier == Tier.lidar:
+            scale_confidence = "native_metric"
+        elif scale_ref is not None:
+            scale_confidence = "scaled_via_reference"
+        else:
+            scale_confidence = "unscaled"
 
         from app.pipeline.exporter import export_all
         payload, files = export_all(
