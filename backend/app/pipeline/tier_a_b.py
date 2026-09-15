@@ -30,6 +30,7 @@ def run_video_tier(
     job_id: str,
     scale_reference_m: Optional[float],
     progress_cb: ProgressCb,
+    diag=None,
 ) -> Path:
     """Extract frames from video, then run the photo pipeline on them."""
     images_dir = get_images_dir(job_id)
@@ -45,11 +46,16 @@ def run_video_tier(
     video_path = video_files[0]
     progress_cb("extracting_frames", 5)
 
-    _extract_frames(video_path, images_dir, fps=settings.VIDEO_EXTRACT_FPS)
+    frame_count = _extract_frames(video_path, images_dir, fps=settings.VIDEO_EXTRACT_FPS)
     progress_cb("extracting_frames", 20)
 
+    if diag is not None:
+        diag.set_metric("video_path", str(video_path))
+        diag.set_metric("video_extract_fps", settings.VIDEO_EXTRACT_FPS)
+        diag.set_metric("frames_extracted", frame_count)
+
     # Continue with same COLMAP flow as photo tier
-    return _run_colmap_pipeline(job_id, scale_reference_m, progress_cb)
+    return _run_colmap_pipeline(job_id, scale_reference_m, progress_cb, diag)
 
 
 # ── Tier A entry point ────────────────────────────────────────────────────────
@@ -57,9 +63,10 @@ def run_photo_tier(
     job_id: str,
     scale_reference_m: Optional[float],
     progress_cb: ProgressCb,
+    diag=None,
 ) -> Path:
     """Run COLMAP directly on the uploaded images."""
-    return _run_colmap_pipeline(job_id, scale_reference_m, progress_cb)
+    return _run_colmap_pipeline(job_id, scale_reference_m, progress_cb, diag)
 
 
 # ── ffmpeg frame extraction ───────────────────────────────────────────────────
@@ -114,6 +121,7 @@ def _run_colmap_pipeline(
     job_id: str,
     scale_reference_m: Optional[float],
     progress_cb: ProgressCb,
+    diag=None,
     single_camera: bool = True,
 ) -> Path:
     """
@@ -132,6 +140,14 @@ def _run_colmap_pipeline(
 
     has_cuda = _is_cuda_available()
 
+    if diag is not None:
+        diag.set_metric("colmap_cuda_available", has_cuda)
+        diag.set_metric("colmap_single_camera", single_camera)
+        diag.set_metric(
+            "input_image_count",
+            sum(1 for p in images_dir.iterdir() if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg", ".png", ".heic"}),
+        )
+
     sfm_cmd = [
         settings.COLMAP_BIN, "automatic_reconstructor",
         "--workspace_path", str(workspace),
@@ -149,6 +165,9 @@ def _run_colmap_pipeline(
     # The automatic_reconstructor places dense output in workspace/dense/
     fused_ply = workspace / "dense" / "fused.ply"
 
+    if diag is not None and fused_ply.exists():
+        diag.set_metric("colmap_dense_source", "automatic_dense")
+
     # If automatic_reconstructor didn't produce dense output (e.g. CPU mode), convert sparse model to PLY
     if not fused_ply.exists():
         sparse_dir = workspace / "sparse"
@@ -156,6 +175,9 @@ def _run_colmap_pipeline(
         if sparse_model is not None:
             dense_dir.mkdir(parents=True, exist_ok=True)
             log.info("converting_sparse_model_to_ply", model_dir=str(sparse_model))
+            if diag is not None:
+                diag.set_metric("colmap_dense_source", "sparse_model_converted")
+                diag.add_warning("COLMAP produced no dense cloud; sparse model was converted to PLY instead.")
             _run_cmd([
                 settings.COLMAP_BIN, "model_converter",
                 "--input_path", str(sparse_model),
@@ -165,6 +187,9 @@ def _run_colmap_pipeline(
 
     # If still not found and CUDA is available, run manual sequence
     if not fused_ply.exists():
+        if diag is not None:
+            diag.set_metric("colmap_dense_source", "manual_dense_sequence")
+            diag.add_warning("COLMAP automatic reconstruction produced no PLY; manual dense sequence was used.")
         fused_ply = _run_manual_dense(workspace, images_dir, dense_dir, progress_cb)
 
     if not fused_ply.exists():

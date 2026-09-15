@@ -57,6 +57,7 @@ services:
       LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
       LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-120}
       LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-4096}
+      DASHBOARD_BASE_URL: ${DASHBOARD_BASE_URL:-http://localhost:8000}
     volumes:
       - ./app:/app/app
       - ../web_dashboard:/app/web_dashboard
@@ -90,6 +91,7 @@ services:
       LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
       LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-120}
       LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-4096}
+      DASHBOARD_BASE_URL: ${DASHBOARD_BASE_URL:-http://localhost:8000}
     volumes:
       - ./app:/app/app
       - ./data:/app/data

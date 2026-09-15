@@ -100,6 +100,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text);
 .claim-status-line .label { color: var(--text-dim); }
 .claim-status-line .value { color: var(--text); text-align: right; word-break: break-all; }
 .claim-status-line .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.claim-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 
 /* ── Claim report modal ───────────────────────────────────────────────────── */
 .modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; }

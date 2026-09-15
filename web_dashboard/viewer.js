@@ -95,6 +95,13 @@ async function loadResults() {
         const parsed = JSON.parse(errText);
         msg = parsed.detail || errText;
       } catch (_) {}
+      try {
+        const infoRes = await fetch(`${base}/jobs/${jobId}`);
+        if (infoRes.ok) {
+          const info = await infoRes.json();
+          if (info.error_message) msg = info.error_message;
+        }
+      } catch (_) {}
       throw new Error(`HTTP ${res.status}: ${msg}`);
     }
     const data = await res.json();
@@ -361,7 +368,9 @@ const claimStatusCard     = document.getElementById('claimStatusCard');
 const claimIdEl           = document.getElementById('claimId');
 const claimStatusEl       = document.getElementById('claimStatus');
 const claimProgressEl     = document.getElementById('claimProgress');
+const claimImagesEl       = document.getElementById('claimImages');
 const viewClaimReportBtn  = document.getElementById('viewClaimReportBtn');
+const viewClaimObservabilityBtn = document.getElementById('viewClaimObservabilityBtn');
 
 const reportModal    = document.getElementById('reportModal');
 const reportBackdrop = document.getElementById('reportBackdrop');
@@ -372,6 +381,10 @@ fileClaimBtn.addEventListener('click', fileClaim);
 viewClaimReportBtn.addEventListener('click', () => {
   const claimId = claimIdEl.textContent;
   if (claimId && claimId !== '—') viewClaimReport(claimId);
+});
+viewClaimObservabilityBtn.addEventListener('click', () => {
+  const claimId = claimIdEl.textContent;
+  if (claimId && claimId !== '—') viewClaimObservability(claimId);
 });
 closeReportBtn.addEventListener('click', closeReportModal);
 reportBackdrop.addEventListener('click', closeReportModal);
@@ -420,6 +433,7 @@ async function fileClaim() {
     claimIdEl.textContent = claimId;
     claimStatusEl.textContent = claim.status;
     claimProgressEl.textContent = `${claim.progress_pct}%`;
+    claimImagesEl.textContent = claimFiles.files.length;
     claimStatusCard.classList.remove('hidden');
 
     // 2. Upload capture files
@@ -455,6 +469,7 @@ function pollClaim(claimId, base) {
 
       claimStatusEl.textContent = claim.status;
       claimProgressEl.textContent = `${claim.progress_pct}%`;
+      claimImagesEl.textContent = claim.image_count ?? '—';
 
       if (claim.status === 'ready_for_review') {
         clearInterval(timer);
@@ -485,6 +500,20 @@ async function viewClaimReport(claimId) {
     reportModal.classList.remove('hidden');
   } catch (err) {
     showStatus(`Report error: ${err.message}`, false);
+    console.error(err);
+  }
+}
+
+async function viewClaimObservability(claimId) {
+  const base = serverInput.value.replace(/\/$/, '');
+  try {
+    const res = await fetch(`${base}/claims/${claimId}/observability`);
+    if (!res.ok) throw new Error(await _errText(res));
+    const data = await res.json();
+    reportContent.textContent = data.observability_markdown || 'No observability content.';
+    reportModal.classList.remove('hidden');
+  } catch (err) {
+    showStatus(`Observability error: ${err.message}`, false);
     console.error(err);
   }
 }

@@ -63,6 +63,7 @@ class WallSegment:
 def extract_structural_elements(
     ply_path: Path,
     progress_cb: ProgressCb,
+    diag=None,
 ) -> list[WallSegment]:
     """
     Load a metric PLY and extract wall segments with opening detection.
@@ -81,6 +82,8 @@ def extract_structural_elements(
     pcd = o3d.io.read_point_cloud(str(ply_path))
     n_pts = len(pcd.points)
     log.info("pcd_loaded", n_points=n_pts)
+    if diag is not None:
+        diag.set_metric("point_cloud_points_raw", n_pts)
 
     if n_pts < 50:
         raise ValueError(
@@ -91,6 +94,9 @@ def extract_structural_elements(
     # ── 1. Remove statistical outliers ───────────────────────────────────────
     if len(pcd.points) >= 20:
         pcd, _ = pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
+
+    if diag is not None:
+        diag.set_metric("point_cloud_points_after_outlier_removal", len(pcd.points))
 
     if len(pcd.points) < 10:
         raise ValueError(
@@ -140,6 +146,10 @@ def extract_structural_elements(
         else:
             log.info("slanted_plane_skipped", idx=i, pts=len(pts_plane), normal=normal.tolist())
 
+    if diag is not None:
+        diag.set_metric("horizontal_plane_count", len(horizontal_planes))
+        diag.set_metric("wall_plane_count", len(raw_walls))
+
     pts_all = np.asarray(pcd.points)
     floor_cloud: Optional[o3d.geometry.PointCloud] = None
     ceiling_cloud: Optional[o3d.geometry.PointCloud] = None
@@ -167,10 +177,16 @@ def extract_structural_elements(
         wall_count=len(raw_walls),
     )
 
+    if diag is not None:
+        diag.set_metric("floor_z", round(floor_z, 3))
+        diag.set_metric("ceiling_z", round(ceiling_z, 3))
+        diag.set_metric("floor_points", len(floor_cloud.points) if floor_cloud else 0)
+        diag.set_metric("ceiling_points", len(ceiling_cloud.points) if ceiling_cloud else 0)
+
     progress_cb("vectorizing", 75)
 
     # ── 4. Vectorize walls → 2D line segments ─────────────────────────────────
-    wall_segments = _vectorize_walls(raw_walls, floor_z=floor_z, ceiling_z=ceiling_z)
+    wall_segments = _vectorize_walls(raw_walls, floor_z=floor_z, ceiling_z=ceiling_z, diag=diag)
 
     # ── 5. Snap to dominant orthogonal axes ──────────────────────────────────
     wall_segments = _snap_orthogonal(wall_segments)
@@ -184,6 +200,10 @@ def extract_structural_elements(
             seg.openings = _detect_openings(seg, plane_pts, floor_z_val)
 
     log.info("extraction_complete", wall_count=len(wall_segments))
+    if diag is not None:
+        diag.set_metric("wall_count", len(wall_segments))
+        diag.set_metric("door_count", sum(1 for s in wall_segments if s.opening_type == "door"))
+        diag.set_metric("window_count", sum(1 for s in wall_segments if s.opening_type == "window"))
     progress_cb("vectorizing", 88)
     return wall_segments
 
@@ -217,6 +237,7 @@ def _vectorize_walls(
     raw_walls: list[tuple[np.ndarray, o3d.geometry.PointCloud]],
     floor_z: float,
     ceiling_z: float,
+    diag=None,
 ) -> list[WallSegment]:
     """
     For each RANSAC wall plane, project its inliers onto a horizontal slice band
@@ -253,6 +274,8 @@ def _vectorize_walls(
 
         if len(slice_pts) < 10:
             log.warning("wall_slice_too_sparse", idx=idx, n=len(slice_pts))
+            if diag is not None:
+                diag.add_warning(f"Wall plane {idx} had too few slice points ({len(slice_pts)}) and was skipped.")
             continue
 
         x, y = slice_pts[:, 0], slice_pts[:, 1]

@@ -21,8 +21,9 @@ from celery import Celery
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
-from app.config import settings, get_results_dir
+from app.config import settings, get_results_dir, get_images_dir
 from app.models.job import Job, JobStatus, Tier
+from app.pipeline.observability import RunDiagnostics
 
 log = structlog.get_logger()
 
@@ -101,12 +102,15 @@ def _run_pipeline_core(job_id: str):
     """
     db = _make_sync_session()
     log = structlog.get_logger().bind(job_id=job_id)
+    diag = None
 
     def progress(stage: str, pct: int, **extra):
         """Update DB + publish Redis message in one call."""
         _update_job(db, job_id, status=JobStatus(stage) if _is_valid_status(stage) else None,
                     progress_pct=pct)
         _publish_progress(job_id, stage, pct, **extra)
+        if diag is not None:
+            diag.observe_stage(stage, pct)
         log.info("progress", stage=stage, pct=pct)
 
     try:
@@ -117,15 +121,16 @@ def _run_pipeline_core(job_id: str):
 
         tier = job.tier
         scale_ref = job.scale_reference_m
+        diag = RunDiagnostics(tier, scale_ref)
 
         # ── Tier processing → metric PLY ──────────────────────────────────────
         from app.pipeline.tier_router import route as route_tier
-        metric_ply = route_tier(job_id, tier, scale_ref, progress)
+        metric_ply = route_tier(job_id, tier, scale_ref, progress, diag)
 
         # ── Common backend ────────────────────────────────────────────────────
         progress("plane_extraction", 60)
         from app.pipeline.common_backend import extract_structural_elements, compute_room_area
-        walls = extract_structural_elements(metric_ply, progress)
+        walls = extract_structural_elements(metric_ply, progress, diag)
 
         # ── Export ────────────────────────────────────────────────────────────
         progress("exporting", 90)
@@ -133,10 +138,31 @@ def _run_pipeline_core(job_id: str):
 
         if tier == Tier.lidar:
             scale_confidence = "native_metric"
+            scale_factor = 1.0
+            scale_method = "native_metric"
         elif scale_ref is not None:
             scale_confidence = "scaled_via_reference"
+            scale_factor = scale_ref
+            scale_method = "reference_object_placeholder"
+            diag.add_warning(
+                "Scale anchoring uses a placeholder reconstructed reference length "
+                "(1.0 units); photo/video clouds are scaled by the raw "
+                "scale_reference_m and may not be metric."
+            )
         else:
             scale_confidence = "unscaled"
+            scale_factor = 1.0
+            scale_method = "unscaled"
+
+        diag.set_metric("scale_factor", scale_factor)
+        diag.set_metric("scale_method", scale_method)
+        diag.set_metric(
+            "input_image_count",
+            sum(
+                1 for p in get_images_dir(job_id).iterdir()
+                if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg", ".png", ".heic"}
+            ),
+        )
 
         from app.pipeline.exporter import export_all
         payload, files = export_all(
@@ -148,9 +174,15 @@ def _run_pipeline_core(job_id: str):
 
         # Attach files to payload
         payload["files"] = files
+        payload["scale_factor"] = scale_factor
+        payload["scale_method"] = scale_method
 
         # ── Finalise job ──────────────────────────────────────────────────────
         area = compute_room_area(walls)
+        diag.set_metric("room_area_m2", area)
+        diag.set_metric("wall_count", len(walls))
+        payload["diagnostics"] = diag.to_dict()
+
         _update_job(
             db, job_id,
             status=JobStatus.complete,

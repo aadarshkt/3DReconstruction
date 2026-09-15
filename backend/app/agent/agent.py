@@ -18,7 +18,8 @@ import structlog
 from sqlalchemy.orm import Session
 
 from app.agent import tools
-from app.agent.report import build_claim_report, write_claim_outputs
+from app.agent.report import build_claim_report, build_observability_report, write_claim_outputs
+from app.config import settings
 from app.models.claim import Claim, ClaimStatus
 from app.models.job import JobStatus
 from app.services.llm import LLMClient
@@ -85,7 +86,7 @@ def _process_claim(db: Session, claim: Claim) -> dict:
     metrics = _build_metrics(job)
     imagery = tools.collect_imagery(job_id)
     try:
-        damage_assessment = _assess_damage(claim, metrics, imagery)
+        damage_assessment, llm_input, raw_response = _assess_damage(claim, metrics, imagery)
     except Exception as exc:
         log.warning("llm_assessment_failed", claim_id=claim_id, error=str(exc))
         damage_assessment = {
@@ -96,14 +97,19 @@ def _process_claim(db: Session, claim: Claim) -> dict:
             "estimated_loss_band": "unknown",
             "llm_error": str(exc)[:500],
         }
+        llm_input = {"model": settings.LLM_MODEL, "imagery": imagery, "error": str(exc)}
+        raw_response = str(exc)
 
     _update_claim(db, claim_id, damage_assessment=damage_assessment)
 
     # ── 3. Draft report ──────────────────────────────────────────────────────
     _update_claim(db, claim_id, status=ClaimStatus.drafting, progress_pct=90)
 
-    markdown = build_claim_report(claim, job, damage_assessment)
-    report_path = write_claim_outputs(claim_id, markdown, damage_assessment)
+    claim_markdown = build_claim_report(claim, job, damage_assessment)
+    obs_markdown = build_observability_report(claim, job, damage_assessment, llm_input, raw_response)
+    report_path = write_claim_outputs(
+        claim_id, job_id, claim_markdown, obs_markdown, damage_assessment, llm_input, raw_response
+    )
 
     _update_claim(
         db,
@@ -129,7 +135,7 @@ def _build_metrics(job) -> dict:
     }
 
 
-def _assess_damage(claim: Claim, metrics: dict, imagery: list[str]) -> dict:
+def _assess_damage(claim: Claim, metrics: dict, imagery: list[str]) -> tuple[dict, dict, str]:
     client = LLMClient()
 
     user_content = (
@@ -153,7 +159,14 @@ def _assess_damage(claim: Claim, metrics: dict, imagery: list[str]) -> dict:
         )
         raw = client.chat_sync(messages)
 
-    return _parse_json_response(raw)
+    llm_input = {
+        "model": settings.LLM_MODEL,
+        "max_tokens": settings.LLM_MAX_TOKENS,
+        "system_prompt": ASSESSMENT_SYSTEM_PROMPT,
+        "user_content": messages[1]["content"],
+        "imagery": imagery,
+    }
+    return _parse_json_response(raw), llm_input, raw
 
 
 def _parse_json_response(text: str) -> dict:

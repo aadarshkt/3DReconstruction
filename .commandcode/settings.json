@@ -9,7 +9,14 @@
       "Shell(cat:*)",
       "Shell(sleep:*)",
       "Shell(curl -s http://localhost:8000/health)",
-      "Shell(chmod:*)"
+      "Shell(chmod:*)",
+      "Shell(python3 -m py_compile app/agent/report.py)",
+      "Shell(python3 -m py_compile app/pipeline/observability.py app/pipeline/tier_router.py app/pipeline/tier_a_b.py app/pipeline/tier_c.py app/pipeline/common_backend.py app/tasks/celery_tasks.py app/config.py app/agent/report.py app/agent/agent.py app/api/claims.py)",
+      "Shell(curl -s http://localhost:8000/claims/)",
+      "Shell(python3 -m json.tool)",
+      "Shell(curl -s -w \\nHTTP %{http_code}\\n http://localhost:8000/claims//observability)",
+      "Shell(curl -s -w \\nHTTP %{http_code}\\n http://localhost:8000/claims//report)",
+      "Shell(scratch=\"$COMMANDCODE_SCRATCHPAD\"; cat > \"$scratch/room.json\" <<'EOF' {\"walls\":[{\"dimensions\":{\"width\":4.0,\"height\":2.4},\"transform\":[[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]}]} EOF base=\"http://localhost:8000\"; body='{\"policyholder_name\":\"Smoke\",\"policy_number\":\"SMOKE-1\",\"property_address\":\"Test\",\"incident_type\":\"Water damage\",\"incident_description\":\"smoke test\"}'; cid=$(curl -s -X POST \"$base/claims/create\" -H 'Content-Type: application/json' -d \"$body\" | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"claim_id\"])'); echo \"claim=$cid\"; echo \"upload:\"; curl -s -X POST \"$base/claims/$cid/upload\" -F \"files=@$scratch/room.json\"; echo; echo \"start:\"; curl -s -X POST \"$base/claims/$cid/start\"; echo; for i in $(seq 1 40); do j=$(curl -s \"$base/claims/$cid\"); st=$(python3 -c 'import json,sys; print(json.load(sys.stdin)[\"status\"])' <<<\"$j\"); pct=$(python3 -c 'import json,sys; print(json.load(sys.stdin)[\"progress_pct\"])' <<<\"$j\"); echo \"poll $i: $st $pct%\"; if [ \"$st\" = \"ready_for_review\" ] || [ \"$st\" = \"failed\" ]; then break; fi; sleep 3; done; echo \"=== OBSERVABILITY ===\"; curl -s \"$base/claims/$cid/observability\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"observability_markdown\",\"\"))' | head -60; echo \"=== CLAIM REPORT ===\"; curl -s \"$base/claims/$cid/report\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"report_markdown\",\"\"))' | head -20)"
     ],
     "deny": [],
     "defaultMode": "default"

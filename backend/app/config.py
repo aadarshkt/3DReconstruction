@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     LLM_TIMEOUT_S: int = 120
     LLM_MAX_TOKENS: int = 4096
 
+    # ── Dashboard ─────────────────────────────────────────────────────────────
+    # Base URL used in generated claim reports to link back to the web viewer.
+    DASHBOARD_BASE_URL: str = "http://localhost:8000"
+
     # ── CORS ─────────────────────────────────────────────────────────────────
     # Add mobile app origins and local dashboard here
     CORS_ORIGINS: list[str] = ["*"]       # tighten in production
@@ -88,5 +92,12 @@ def get_claim_dir(claim_id: str) -> Path:
 
 def get_claim_inputs_dir(claim_id: str) -> Path:
     p = get_claim_dir(claim_id) / "inputs"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def get_job_report_dir(job_id: str) -> Path:
+    """Return the report directory for a specific job, creating it if needed."""
+    p = get_job_dir(job_id) / "reports"
     p.mkdir(parents=True, exist_ok=True)
     return p

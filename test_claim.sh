@@ -87,11 +87,31 @@ while true; do
 done
 
 if [ "$status" = "ready_for_review" ]; then
-  echo "==> Fetching report..."
+  claim_json=$(curl -s "$BASE_URL/claims/$claim_id")
+  job_id=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("job_id") or "")' <<<"$claim_json")
+
+  echo ""
+  echo "================================================================"
+  echo "  CLAIM REPORT"
+  echo "================================================================"
   curl -s "$BASE_URL/claims/$claim_id/report" \
-    | python3 -c 'import json,sys; print(json.load(sys.stdin)["report_markdown"])' \
-    | tee "claim_report_${claim_id}.md"
-  echo "Report saved to claim_report_${claim_id}.md"
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["report_markdown"])'
+
+  echo ""
+  echo "================================================================"
+  echo "  OBSERVABILITY REPORT"
+  echo "================================================================"
+  curl -s "$BASE_URL/claims/$claim_id/observability" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["observability_markdown"])'
+
+  echo ""
+  echo "================================================================"
+  echo "  RUN ARTIFACTS"
+  echo "================================================================"
+  echo "Claim ID : $claim_id"
+  echo "Job ID   : $job_id"
+  echo "Reports  : backend/data/$job_id/reports/"
+  echo "Dashboard: $BASE_URL/?job_id=$job_id"
 else
   echo "==> Claim failed. Last response:"
   curl -s "$BASE_URL/claims/$claim_id" | python3 -m json.tool

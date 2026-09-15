@@ -6,3 +6,12 @@ complete todo list of all parts created upfront before implementation begins. Co
 - Prefers small reusable scripts to automate repetitive API/CLI testing workflows rather than re-typing command sequences each time. Confidence: 0.6
 - Prioritizes validating the idea quickly (MVP-first) over fidelity of individual components — accepts "any LLM" during prototyping. Confidence: 0.7
 - Prefers free and low-friction (not rate-limited/easily available) AI/LLM options over higher-quality paid or rate-limited ones, at least while prototyping. Confidence: 0.6
+- Wants generated reports to include artifacts for manual verification — prefers clickable dashboard/viewer links over raw local file paths. Confidence: 0.8
+- Values end-to-end traceability of the ML/LLM pipeline: wants to know exactly which inputs (images, metrics) were sent to the model, the model's raw output, and how to inspect the relevant logs — surfaces this in reports and dashboards. Confidence: 0.8
+- References existing scripts/files (e.g., test_pipeline.py) as the canonical pattern to follow when requesting changes. Confidence: 0.5
+- Prefers short, concise replies over long explanations. Confidence: 0.9
+- Prefers surfacing pipeline configuration parameters that affect end results (e.g., COLMAP quality/threads/GPU, RANSAC thresholds, scale factor) in reports and dashboards for reproducibility. Confidence: 0.8
+- Prefers full process-level observability for closed-loop testing/debugging: per-stage timings, intermediate diagnostics (point counts, registered images, plane/wall counts), warnings, and error status surfaced in the dashboard/report — not just a single progress bar. Confidence: 0.8
+- Prefers separating the business-facing claim report from the technical observability report — observability details (parameters, image paths, diagnostics) belong in the observability report, not the claim report. Confidence: 0.8
+- Prefers a single driver/test script (e.g., test_claim.sh) as the entry point that triggers the whole flow and prints all produced artifacts and dashboard links. Confidence: 0.7
+- Prefers collecting all artifacts for a single run into a single per-job folder rather than scattering them across the repo root. Confidence: 0.8

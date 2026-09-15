@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_claim_dir, get_claim_inputs_dir
+from app.config import get_claim_inputs_dir, get_images_dir, get_job_report_dir
 from app.models.claim import Claim, ClaimStatus
 from app.main import get_db
 
@@ -56,6 +56,7 @@ class ClaimResponse(BaseModel):
     incident_description: Optional[str]
     scale_reference_m: Optional[float]
     job_id: Optional[str]
+    image_count: Optional[int]
     damage_assessment: Optional[dict]
     report_path: Optional[str]
     error_message: Optional[str]
@@ -72,6 +73,13 @@ class ClaimReportResponse(BaseModel):
     status: ClaimStatus
     report_markdown: str
     damage_assessment: Optional[dict]
+
+
+class ClaimObservabilityResponse(BaseModel):
+    claim_id: str
+    job_id: Optional[str]
+    status: ClaimStatus
+    observability_markdown: str
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
@@ -170,8 +178,12 @@ async def get_claim(claim_id: str, db: AsyncSession = Depends(get_db)):
 async def get_claim_report(claim_id: str, db: AsyncSession = Depends(get_db)):
     claim = await _get_or_404(claim_id, db)
 
-    report_path = get_claim_dir(claim_id) / "claim_report.md"
-    assessment_path = get_claim_dir(claim_id) / "damage_assessment.json"
+    if not claim.job_id:
+        raise HTTPException(status_code=425, detail="Claim report is not available yet.")
+
+    report_dir = get_job_report_dir(claim.job_id)
+    report_path = report_dir / "claim_report.md"
+    assessment_path = report_dir / "damage_assessment.json"
 
     if not report_path.exists():
         raise HTTPException(status_code=425, detail="Claim report is not available yet.")
@@ -192,6 +204,25 @@ async def get_claim_report(claim_id: str, db: AsyncSession = Depends(get_db)):
     )
 
 
+@router.get("/{claim_id}/observability", response_model=ClaimObservabilityResponse)
+async def get_claim_observability(claim_id: str, db: AsyncSession = Depends(get_db)):
+    claim = await _get_or_404(claim_id, db)
+
+    if not claim.job_id:
+        raise HTTPException(status_code=425, detail="Observability report is not available yet.")
+
+    obs_path = get_job_report_dir(claim.job_id) / "observability_report.md"
+    if not obs_path.exists():
+        raise HTTPException(status_code=425, detail="Observability report is not available yet.")
+
+    return ClaimObservabilityResponse(
+        claim_id=claim_id,
+        job_id=claim.job_id,
+        status=claim.status,
+        observability_markdown=obs_path.read_text(),
+    )
+
+
 @router.delete("/{claim_id}", status_code=204)
 async def delete_claim(claim_id: str, db: AsyncSession = Depends(get_db)):
     claim = await _get_or_404(claim_id, db)
@@ -209,6 +240,11 @@ async def _get_or_404(claim_id: str, db: AsyncSession) -> Claim:
 
 
 def _to_response(claim: Claim) -> ClaimResponse:
+    if claim.job_id:
+        image_count = _count_images(get_images_dir(claim.job_id))
+    else:
+        image_count = _count_images(get_claim_inputs_dir(claim.id))
+
     return ClaimResponse(
         claim_id=claim.id,
         status=claim.status,
@@ -220,9 +256,21 @@ def _to_response(claim: Claim) -> ClaimResponse:
         incident_description=claim.incident_description,
         scale_reference_m=claim.scale_reference_m,
         job_id=claim.job_id,
+        image_count=image_count,
         damage_assessment=claim.damage_assessment,
         report_path=claim.report_path,
         error_message=claim.error_message,
+    )
+
+
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".heic"}
+
+
+def _count_images(path: Path) -> int:
+    if not path.exists():
+        return 0
+    return sum(
+        1 for p in path.iterdir() if p.is_file() and p.suffix.lower() in IMAGE_EXTS
     )
 
 

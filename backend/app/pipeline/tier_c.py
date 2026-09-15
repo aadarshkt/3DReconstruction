@@ -26,7 +26,7 @@ log = structlog.get_logger()
 ProgressCb = Callable[[str, int], None]
 
 
-def run_lidar_tier(job_id: str, progress_cb: ProgressCb) -> Path:
+def run_lidar_tier(job_id: str, progress_cb: ProgressCb, diag=None) -> Path:
     """
     Convert LiDAR export to a metric point cloud.
 
@@ -43,19 +43,19 @@ def run_lidar_tier(job_id: str, progress_cb: ProgressCb) -> Path:
     json_files = list(job_dir.glob("*.json")) + list((job_dir / "images").glob("*.json"))
     if json_files:
         log.info("lidar_json_found", path=str(json_files[0]))
-        return _from_roomplan_json(job_id, json_files[0], progress_cb)
+        return _from_roomplan_json(job_id, json_files[0], progress_cb, diag)
 
     # ── Try USDZ mesh ──────────────────────────────────────────────────────────
     usdz_files = list(job_dir.glob("*.usdz")) + list((job_dir / "images").glob("*.usdz"))
     if usdz_files:
         log.info("lidar_usdz_found", path=str(usdz_files[0]))
-        return _from_usdz(job_id, usdz_files[0], progress_cb)
+        return _from_usdz(job_id, usdz_files[0], progress_cb, diag)
 
     # ── Try PLY / OBJ (pre-converted mesh) ────────────────────────────────────
     mesh_files = list(job_dir.glob("*.ply")) + list(job_dir.glob("*.obj"))
     if mesh_files:
         log.info("lidar_mesh_found", path=str(mesh_files[0]))
-        return _from_mesh_file(job_id, mesh_files[0], progress_cb)
+        return _from_mesh_file(job_id, mesh_files[0], progress_cb, diag)
 
     raise FileNotFoundError(
         f"No LiDAR export found in job {job_id}. "
@@ -64,7 +64,7 @@ def run_lidar_tier(job_id: str, progress_cb: ProgressCb) -> Path:
 
 
 # ── RoomPlan JSON → point cloud ───────────────────────────────────────────────
-def _from_roomplan_json(job_id: str, json_path: Path, progress_cb: ProgressCb) -> Path:
+def _from_roomplan_json(job_id: str, json_path: Path, progress_cb: ProgressCb, diag=None) -> Path:
     """
     Parse a RoomPlan CapturedRoom JSON export and synthesise a point cloud
     from the wall / floor / ceiling geometry.
@@ -111,6 +111,9 @@ def _from_roomplan_json(job_id: str, json_path: Path, progress_cb: ProgressCb) -
     out = _save_metric_ply(job_id, pcd)
     progress_cb("lidar_converting", 90)
     log.info("roomplan_json_converted", job_id=job_id, n_points=len(pcd.points))
+    if diag is not None:
+        diag.set_metric("lidar_source", "roomplan_json")
+        diag.set_metric("lidar_point_cloud_points", len(pcd.points))
     return out
 
 
@@ -144,7 +147,7 @@ def _sample_wall(element: dict, density: int = 200) -> np.ndarray:
 
 
 # ── USDZ → point cloud ────────────────────────────────────────────────────────
-def _from_usdz(job_id: str, usdz_path: Path, progress_cb: ProgressCb) -> Path:
+def _from_usdz(job_id: str, usdz_path: Path, progress_cb: ProgressCb, diag=None) -> Path:
     """
     Convert a USDZ (ZIP of USD files) to a point cloud by extracting the mesh
     and sampling it.
@@ -184,17 +187,17 @@ def _from_usdz(job_id: str, usdz_path: Path, progress_cb: ProgressCb) -> Path:
         else:
             raise FileNotFoundError("No usable mesh found inside USDZ archive.")
 
-    return _mesh_to_ply(job_id, mesh, progress_cb)
+    return _mesh_to_ply(job_id, mesh, progress_cb, diag)
 
 
 # ── Generic mesh file → point cloud ──────────────────────────────────────────
-def _from_mesh_file(job_id: str, mesh_path: Path, progress_cb: ProgressCb) -> Path:
+def _from_mesh_file(job_id: str, mesh_path: Path, progress_cb: ProgressCb, diag=None) -> Path:
     progress_cb("lidar_converting", 25)
     mesh = o3d.io.read_triangle_mesh(str(mesh_path))
-    return _mesh_to_ply(job_id, mesh, progress_cb)
+    return _mesh_to_ply(job_id, mesh, progress_cb, diag)
 
 
-def _mesh_to_ply(job_id: str, mesh: o3d.geometry.TriangleMesh, progress_cb: ProgressCb) -> Path:
+def _mesh_to_ply(job_id: str, mesh: o3d.geometry.TriangleMesh, progress_cb: ProgressCb, diag=None) -> Path:
     """Sample a mesh surface into a dense point cloud."""
     n_points = max(50_000, len(mesh.vertices) * 10)
     pcd = mesh.sample_points_poisson_disk(number_of_points=n_points)
@@ -202,6 +205,9 @@ def _mesh_to_ply(job_id: str, mesh: o3d.geometry.TriangleMesh, progress_cb: Prog
     out = _save_metric_ply(job_id, pcd)
     progress_cb("lidar_converting", 90)
     log.info("mesh_to_ply_done", job_id=job_id, n_points=len(pcd.points))
+    if diag is not None:
+        diag.set_metric("lidar_source", "mesh")
+        diag.set_metric("lidar_point_cloud_points", len(pcd.points))
     return out
 
 

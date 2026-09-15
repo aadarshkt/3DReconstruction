@@ -20,6 +20,7 @@ def route(
     tier: Tier,
     scale_reference_m: Optional[float],
     progress_cb,        # callable(stage: str, pct: int)
+    diag,               # RunDiagnostics
 ) -> Path:
     """
     Run the appropriate tier pipeline and return the path to `scan_metric.ply`.
@@ -38,22 +39,22 @@ def route(
     """
     if tier == Tier.photos:
         from app.pipeline.tier_a_b import run_photo_tier
-        return run_photo_tier(job_id, scale_reference_m, progress_cb)
+        return run_photo_tier(job_id, scale_reference_m, progress_cb, diag)
 
     elif tier == Tier.video:
         from app.pipeline.tier_a_b import run_video_tier
-        return run_video_tier(job_id, scale_reference_m, progress_cb)
+        return run_video_tier(job_id, scale_reference_m, progress_cb, diag)
 
     elif tier == Tier.lidar:
         from app.pipeline.tier_c import run_lidar_tier
-        return run_lidar_tier(job_id, progress_cb)
+        return run_lidar_tier(job_id, progress_cb, diag)
 
     elif tier == Tier.hybrid:
         from app.pipeline.tier_c import run_lidar_tier
         from app.pipeline.tier_a_b import run_video_tier, run_photo_tier
         
         # 1. Target: Metric LiDAR cloud
-        lidar_metric_ply = run_lidar_tier(job_id, progress_cb)
+        lidar_metric_ply = run_lidar_tier(job_id, progress_cb, diag)
         
         # 2. Source: Unscaled COLMAP cloud (detect if video or photos exist)
         job_dir = get_job_dir(job_id)
@@ -62,12 +63,12 @@ def route(
                     + list(images_dir.glob("*.mp4")) + list(images_dir.glob("*.mov"))
         
         if video_files:
-            photo_ply = run_video_tier(job_id, None, progress_cb)
+            photo_ply = run_video_tier(job_id, None, progress_cb, diag)
         else:
-            photo_ply = run_photo_tier(job_id, None, progress_cb)
+            photo_ply = run_photo_tier(job_id, None, progress_cb, diag)
             
         # 3. Fuse!
-        return fuse_tiers(photo_ply, lidar_metric_ply, progress_cb)
+        return fuse_tiers(photo_ply, lidar_metric_ply, progress_cb, diag)
 
     else:
         raise ValueError(f"Unknown tier: {tier!r}")
@@ -77,6 +78,7 @@ def fuse_tiers(
     photo_ply: Path,
     lidar_ply: Path,
     progress_cb,
+    diag,
 ) -> Path:
     """
     Cross-tier fusion: align an unscaled photo/video PLY to a metric LiDAR PLY
@@ -143,6 +145,9 @@ def fuse_tiers(
     # Scale factor ≈ geometric mean of diagonal scaling components
     scale = float(np.cbrt(abs(np.linalg.det(T[:3, :3]))))
     log.info("icp_fusion", scale_factor=scale, fitness=icp_result.fitness)
+    if diag is not None:
+        diag.set_metric("icp_scale_factor", scale)
+        diag.set_metric("icp_fitness", icp_result.fitness)
 
     # Apply transform to source cloud and merge with target
     source.transform(T)
