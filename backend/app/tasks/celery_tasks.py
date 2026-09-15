@@ -210,19 +210,5 @@ def _run_pipeline_core(job_id: str):
         db.close()
 
 
-# ── Insurance claim agent task ─────────────────────────────────────────────────
-@celery_app.task(bind=True, name="process_claim", max_retries=1)
-def process_claim(self, claim_id: str):
-    """
-    Run the insurance claim agent end-to-end:
-    reconstruction → damage assessment → report generation.
-
-    The agent runs the reconstruction synchronously (not as a nested Celery
-    task) so it is safe on a single-threaded worker.
-    """
-    from app.agent.agent import run_claim_agent
-    return run_claim_agent(claim_id)
-
-
 def _is_valid_status(stage: str) -> bool:
     return stage in {s.value for s in JobStatus}

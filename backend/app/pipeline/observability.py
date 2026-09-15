@@ -24,9 +24,6 @@ PARAMETER_KEYS = [
     "WALL_SLICE_Z_MAX",
     "WALL_SLICE_REL_MIN",
     "WALL_SLICE_REL_MAX",
-    "LLM_MODEL",
-    "LLM_TIMEOUT_S",
-    "LLM_MAX_TOKENS",
 ]
 
 

@@ -12,3 +12,14 @@
 - Prefers short, concise replies over long explanations. Confidence: 0.9
 - Prefers surfacing pipeline configuration parameters that affect end results (e.g., COLMAP quality/threads/GPU, RANSAC thresholds, scale factor) in reports and dashboards for reproducibility. Confidence: 0.8
 - Prefers full process-level observability for closed-loop testing/debugging: per-stage timings, intermediate diagnostics (point counts, registered images, plane/wall counts), warnings, and error status surfaced in the dashboard/report — not just a single progress bar. Confidence: 0.8
+- Prefers separating the business-facing claim report from the technical observability report — observability details (parameters, image paths, diagnostics) belong in the observability report, not the claim report. Confidence: 0.8
+- Prefers a single driver/test script (e.g., test_claim.sh) as the entry point that triggers the whole flow and prints all produced artifacts and dashboard links. Confidence: 0.7
+- Prefers collecting all artifacts for a single run into a single per-job folder rather than scattering them across the repo root. Confidence: 0.8
+- Refers to the Docker Compose services/containers as "pods" (Kubernetes terminology) — "restart the pods" means `docker compose restart api worker`. Confidence: 0.5
+- After code changes, expects the relevant services to be restarted for the changes to take effect. Confidence: 0.7
+- When reporting a failure/bug, wants the root cause ("why it failed") plus concrete steps to analyze, verify, and move forward — not just a patch. Confidence: 0.6
+- Runs on an Apple Silicon Mac (M1) with no dedicated GPU (no CUDA/NVIDIA) — GPU-dependent steps won't run locally, so proposed solutions should be CPU-compatible or clearly flag when a CUDA machine/cloud is required. Confidence: 0.8
+- Wants runtime/ETA estimates for compute-heavy steps (e.g., COLMAP SfM/dense reconstruction), grounded in measured data rather than guesses. Confidence: 0.6
+- Prefers to keep the project scoped narrowly: focused on 3D reconstruction + floor-plan only, with the LLM/insurance-claim agent path deliberately removed. Confidence: 0.8
+- Prefers to isolate structural refactors and feature removals on a dedicated git branch, using commit history to locate the relevant baseline first. Confidence: 0.7
+- When stripping a feature, prefers surgical removal from current HEAD (preserving recent improvements like observability) over reverting to an older clean commit. Confidence: 0.6

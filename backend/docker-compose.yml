@@ -52,11 +52,6 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       DATA_DIR: /app/data
-      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
-      LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-120}
-      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-4096}
       DASHBOARD_BASE_URL: ${DASHBOARD_BASE_URL:-http://localhost:8000}
     volumes:
       - ./app:/app/app
@@ -86,11 +81,6 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       DATA_DIR: /app/data
-      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
-      LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-120}
-      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-4096}
       DASHBOARD_BASE_URL: ${DASHBOARD_BASE_URL:-http://localhost:8000}
     volumes:
       - ./app:/app/app

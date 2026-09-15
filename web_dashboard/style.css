@@ -92,41 +92,6 @@ body { font-family: var(--font); background: var(--bg); color: var(--text);
 }
 .field textarea:focus { outline: none; border-color: var(--accent); }
 
-/* ── Claim status ─────────────────────────────────────────────────────────── */
-.claim-status-line {
-  display: flex; justify-content: space-between; gap: 10px;
-  padding: 6px 0; font-size: 0.82rem; border-bottom: 1px solid rgba(255,255,255,0.04);
-}
-.claim-status-line .label { color: var(--text-dim); }
-.claim-status-line .value { color: var(--text); text-align: right; word-break: break-all; }
-.claim-status-line .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.claim-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
-
-/* ── Claim report modal ───────────────────────────────────────────────────── */
-.modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; }
-.modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); }
-.modal-panel {
-  position: relative; z-index: 1; width: min(720px, 92vw); max-height: 85vh;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: var(--shadow);
-  display: flex; flex-direction: column; overflow: hidden;
-}
-.modal-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 18px; border-bottom: 1px solid var(--border);
-  font-weight: 600; font-size: 0.9rem;
-}
-.modal-close {
-  background: none; border: none; color: var(--text-dim);
-  font-size: 1.4rem; cursor: pointer; line-height: 1;
-}
-.modal-close:hover { color: var(--text); }
-.report-content {
-  padding: 18px; overflow: auto; white-space: pre-wrap; word-break: break-word;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.82rem; line-height: 1.5; color: var(--text);
-}
-
 /* ── Buttons ─────────────────────────────────────────────────────────────────── */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;

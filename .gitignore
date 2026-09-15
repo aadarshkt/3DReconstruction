@@ -121,7 +121,6 @@ Icon
 # Data, Models, and Artifacts
 data/
 outputs/
-models/
 south-building/
 *.ckpt
 *.pt

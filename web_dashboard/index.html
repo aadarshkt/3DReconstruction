@@ -47,53 +47,6 @@
       <button id="loadBtn" class="btn btn-primary">Load Results</button>
     </section>
 
-    <!-- Insurance claim intake -->
-    <section class="card">
-      <h2 class="card-title">New Insurance Claim</h2>
-      <div class="field">
-        <label for="claimName">Policyholder Name</label>
-        <input id="claimName" type="text" placeholder="Jane Doe" />
-      </div>
-      <div class="field">
-        <label for="claimPolicy">Policy Number</label>
-        <input id="claimPolicy" type="text" placeholder="POL-12345" />
-      </div>
-      <div class="field">
-        <label for="claimAddress">Property Address</label>
-        <input id="claimAddress" type="text" placeholder="123 Main St" />
-      </div>
-      <div class="field">
-        <label for="claimIncident">Incident Type</label>
-        <input id="claimIncident" type="text" placeholder="Water damage" />
-      </div>
-      <div class="field">
-        <label for="claimDesc">Description</label>
-        <textarea id="claimDesc" rows="3" placeholder="Describe the incident…"></textarea>
-      </div>
-      <div class="field">
-        <label for="claimScale">Scale Reference (m, optional)</label>
-        <input id="claimScale" type="number" step="0.01" min="0" placeholder="1.0" />
-      </div>
-      <div class="field">
-        <label for="claimFiles">Capture Files</label>
-        <input id="claimFiles" type="file" multiple accept=".jpg,.jpeg,.png,.heic,.mp4,.mov,.json,.usdz,.ply,.obj" />
-      </div>
-      <button id="fileClaimBtn" class="btn btn-primary">File Claim</button>
-    </section>
-
-    <!-- Claim status (hidden until filed) -->
-    <section id="claimStatusCard" class="card hidden">
-      <h2 class="card-title">Claim Status</h2>
-      <div class="claim-status-line"><span class="label">Claim ID</span><span id="claimId" class="value mono">—</span></div>
-      <div class="claim-status-line"><span class="label">Status</span><span id="claimStatus" class="value">—</span></div>
-      <div class="claim-status-line"><span class="label">Progress</span><span id="claimProgress" class="value">—</span></div>
-      <div class="claim-status-line"><span class="label">Images</span><span id="claimImages" class="value">—</span></div>
-      <div class="claim-actions">
-        <button id="viewClaimReportBtn" class="btn btn-download">View Report</button>
-        <button id="viewClaimObservabilityBtn" class="btn btn-download">View Observability</button>
-      </div>
-    </section>
-
     <!-- Job summary (hidden until loaded) -->
     <section id="summaryCard" class="card hidden">
       <h2 class="card-title">Room Summary</h2>
@@ -172,18 +125,6 @@
   </div>
 
 </main>
-
-<!-- ── Claim report modal ─────────────────────────────────────────────────── -->
-<div id="reportModal" class="modal hidden">
-  <div class="modal-backdrop" id="reportBackdrop"></div>
-  <div class="modal-panel">
-    <div class="modal-header">
-      <span>Insurance Claim Report</span>
-      <button id="closeReportBtn" class="modal-close" aria-label="Close">×</button>
-    </div>
-    <pre id="reportContent" class="report-content"></pre>
-  </div>
-</div>
 
 <!-- ── Status bar ────────────────────────────────────────────────────────────── -->
 <div id="statusBar" class="status-bar hidden">

@@ -225,13 +225,11 @@ APIClient.shared.baseURL = "http://192.168.x.x:8000"
 
 ## Future Damage-Assessment Options
 
-The insurance claim agent's v1 damage assessment uses LLM reasoning over uploaded photos and structured reconstruction metrics. For higher-accuracy automated detection, the following approaches are documented for future implementation:
+Damage assessment is not part of the current reconstruction + floor-plan codebase. For future implementation, the following approaches are documented for reference:
 
 ### Trained damage-detection model
 - A PointNet-style point-cloud segmentation model (classifying damage regions directly on `scan_metric.ply`), or a YOLO object-detector over captured frames.
 - Slots into `backend/app/pipeline/` alongside/replacing the heuristic opening detection in `common_backend.py`.
-- Output would be passed to the LLM for narration and quantification.
 
 ### Hybrid approach
-- A detection model first flags damage regions on the point cloud or frames; the LLM then narrates and quantifies them into the claim report.
-- Hook point: `backend/app/agent/tools.py` (add a `detect_damage(job_id)` tool) and `backend/app/agent/agent.py` (merge detector output into `damage_assessment`).
+- A detection model first flags damage regions on the point cloud or frames; a separate narration/quantification step (e.g., an LLM) would then produce a report.
