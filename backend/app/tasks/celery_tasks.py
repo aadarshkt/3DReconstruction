@@ -84,6 +84,13 @@ def _update_job(db: Session, job_id: str, **kwargs):
 @celery_app.task(bind=True, name="run_pipeline", max_retries=1)
 def run_pipeline(self, job_id: str):
     """
+    Celery wrapper around the end-to-end floor plan reconstruction pipeline.
+    """
+    return _run_pipeline_core(job_id)
+
+
+def _run_pipeline_core(job_id: str):
+    """
     End-to-end floor plan reconstruction pipeline.
 
     1. Determine tier (photos / video / lidar).
@@ -93,7 +100,7 @@ def run_pipeline(self, job_id: str):
     5. Update job record with results.
     """
     db = _make_sync_session()
-    log = structlog.get_logger().bind(job_id=job_id, celery_task=self.request.id)
+    log = structlog.get_logger().bind(job_id=job_id)
 
     def progress(stage: str, pct: int, **extra):
         """Update DB + publish Redis message in one call."""
@@ -156,6 +163,7 @@ def run_pipeline(self, job_id: str):
         _publish_progress(job_id, "complete", 100,
                           result_url=f"/jobs/{job_id}/results")
         log.info("pipeline_complete", walls=len(walls), area_m2=area)
+        return {"job_id": job_id, "status": "complete"}
 
     except Exception as exc:
         tb = traceback.format_exc()
@@ -168,6 +176,20 @@ def run_pipeline(self, job_id: str):
 
     finally:
         db.close()
+
+
+# ── Insurance claim agent task ─────────────────────────────────────────────────
+@celery_app.task(bind=True, name="process_claim", max_retries=1)
+def process_claim(self, claim_id: str):
+    """
+    Run the insurance claim agent end-to-end:
+    reconstruction → damage assessment → report generation.
+
+    The agent runs the reconstruction synchronously (not as a nested Celery
+    task) so it is safe on a single-threaded worker.
+    """
+    from app.agent.agent import run_claim_agent
+    return run_claim_agent(claim_id)
 
 
 def _is_valid_status(stage: str) -> bool:

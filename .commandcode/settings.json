@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(python3 -m py_compile app/config.py app/services/llm.py app/models/claim.py app/api/claims.py app/tasks/celery_tasks.py app/agent/tools.py app/agent/agent.py app/agent/report.py app/main.py)",
+      "Shell(python3 -c import celery, sqlalchemy, pydantic_settings, httpx, structlog; print('deps ok') 2 >& 1)",
+      "Shell(docker:*)",
+      "Shell(ls:*)",
+      "Shell(echo:*)",
+      "Shell(cat:*)",
+      "Shell(sleep:*)",
+      "Shell(curl -s http://localhost:8000/health)",
+      "Shell(chmod:*)"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}

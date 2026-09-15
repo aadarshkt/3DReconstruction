@@ -43,6 +43,15 @@ class Settings(BaseSettings):
     WALL_SLICE_REL_MIN: float = 0.25      # relative slice band: 25% of wall height above floor
     WALL_SLICE_REL_MAX: float = 0.75      # relative slice band: 75% of wall height above floor
 
+    # ── LLM / Agent ───────────────────────────────────────────────────────────
+    # OpenAI-compatible chat completions endpoint (works with OpenAI, Azure,
+    # or any self-hosted server that exposes /chat/completions).
+    LLM_BASE_URL: str = "https://api.openai.com/v1"
+    LLM_API_KEY: str = ""
+    LLM_MODEL: str = "gpt-4o-mini"         # use a vision-capable model for photo assessment
+    LLM_TIMEOUT_S: int = 120
+    LLM_MAX_TOKENS: int = 4096
+
     # ── CORS ─────────────────────────────────────────────────────────────────
     # Add mobile app origins and local dashboard here
     CORS_ORIGINS: list[str] = ["*"]       # tighten in production
@@ -66,5 +75,18 @@ def get_images_dir(job_id: str) -> Path:
 
 def get_results_dir(job_id: str) -> Path:
     p = get_job_dir(job_id) / "results"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def get_claim_dir(claim_id: str) -> Path:
+    """Return the data directory for a specific claim, creating it if needed."""
+    p = settings.DATA_DIR / "claims" / claim_id
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def get_claim_inputs_dir(claim_id: str) -> Path:
+    p = get_claim_dir(claim_id) / "inputs"
     p.mkdir(parents=True, exist_ok=True)
     return p

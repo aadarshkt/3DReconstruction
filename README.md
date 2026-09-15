@@ -220,3 +220,18 @@ APIClient.shared.baseURL = "http://192.168.x.x:8000"
 | LiDAR (RoomPlan) | ~1–3 cm |
 | Video (COLMAP) | ~3–7 cm |
 | Photos (COLMAP) | ~2–5 cm |
+
+---
+
+## Future Damage-Assessment Options
+
+The insurance claim agent's v1 damage assessment uses LLM reasoning over uploaded photos and structured reconstruction metrics. For higher-accuracy automated detection, the following approaches are documented for future implementation:
+
+### Trained damage-detection model
+- A PointNet-style point-cloud segmentation model (classifying damage regions directly on `scan_metric.ply`), or a YOLO object-detector over captured frames.
+- Slots into `backend/app/pipeline/` alongside/replacing the heuristic opening detection in `common_backend.py`.
+- Output would be passed to the LLM for narration and quantification.
+
+### Hybrid approach
+- A detection model first flags damage regions on the point cloud or frames; the LLM then narrates and quantifies them into the claim report.
+- Hook point: `backend/app/agent/tools.py` (add a `detect_damage(job_id)` tool) and `backend/app/agent/agent.py` (merge detector output into `damage_assessment`).
