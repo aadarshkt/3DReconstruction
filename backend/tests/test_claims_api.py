@@ -179,3 +179,41 @@ def test_upload_policy_and_analyze(test_client, tmp_path):
         assert chat_data["intent"] == "COST"
 
 
+def test_load_sample_policy_endpoint(test_client):
+    client, session = test_client
+    claim = Claim(
+        id="test-claim-load-sample",
+        cause_of_loss="water",
+        damage_description="Burst kitchen pipe",
+        property_type="residential",
+    )
+    session.add(claim)
+
+    with patch("app.api.claims.rag_engine.ingest_policy") as mock_ingest:
+        mock_ingest.return_value = {"total_pages": 22, "total_chunks": 142}
+        resp = client.post(f"/api/v1/claims/{claim.id}/policy/load-sample")
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["status"] == "success"
+        assert data["ingest_stats"]["total_pages"] == 22
+
+
+def test_seed_demo_endpoint(test_client):
+    client, session = test_client
+    with patch("app.api.claims.seed_demo_pipeline") as mock_seed:
+        mock_seed.return_value = {
+            "job_id": "a441e175-fa81-54b1-872f-532658f8b0fa",
+            "claim_id": "9a4de56b-a2eb-5eb6-86fe-6ecb8d78daec",
+            "status": "seeded",
+            "has_policy_pdf": True,
+            "policy_indexed": True,
+            "ingest_stats": {"total_pages": 22, "total_chunks": 142},
+        }
+        resp = client.post("/api/v1/claims/seed-demo")
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["status"] == "success"
+        assert data["job_id"] == "a441e175-fa81-54b1-872f-532658f8b0fa"
+
+
+

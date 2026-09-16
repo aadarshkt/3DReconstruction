@@ -14,9 +14,11 @@ from app.agents.claim_chat import ClaimChatRouter
 from app.agents.cost_engine import CostEngine
 from app.agents.policy_rag import PolicyRAGEngine
 from app.config import get_claim_dir, settings
+from app.demo import seed_demo_pipeline, SAMPLE_POLICY_PATH
 from app.main import get_db
 from app.models.claim import Claim, ClaimStatus
 from app.models.job import Job
+import shutil
 
 log = structlog.get_logger()
 router = APIRouter()
@@ -102,6 +104,28 @@ async def create_claim(
     return claim
 
 
+@router.post("/seed-demo")
+async def seed_demo_endpoint(
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    1-Click Seed Endpoint for closed-loop testing.
+    Creates a completed 3D reconstruction job (native LiDAR, 24.5 m², 4 walls, SVG + PLY)
+    and links a demo water damage claim with ISO HO-3 policy indexed in vector store.
+    """
+    try:
+        result = await seed_demo_pipeline(db, rag_engine)
+        return {
+            "status": "success",
+            "message": "Demo job and insurance claim seeded successfully with HO-3 policy.",
+            **{k: v for k, v in result.items() if k != "status"},
+        }
+    except Exception as e:
+        log.error("seed_demo_failed", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to seed demo data: {str(e)}")
+
+
+
 @router.get("", response_model=list[ClaimResponse])
 async def list_claims(
     limit: int = 50,
@@ -176,6 +200,50 @@ async def upload_policy(
         claim.error_message = f"Policy indexing failed: {str(e)}"
         await db.commit()
         raise HTTPException(status_code=500, detail=f"Failed to process policy: {str(e)}")
+
+
+@router.post("/{claim_id}/policy/load-sample")
+async def load_sample_policy(
+    claim_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    1-Click Policy Loader: Attaches and indexes the standard ISO HO-3 Homeowners policy fixture.
+    Allows testing vector RAG without needing to locate a PDF file on the local machine.
+    """
+    claim = await db.get(Claim, claim_id)
+    if not claim:
+        raise HTTPException(status_code=404, detail=f"Claim {claim_id} not found")
+
+    if not SAMPLE_POLICY_PATH.exists():
+        raise HTTPException(status_code=404, detail="Sample policy fixture not found on server.")
+
+    claim_dir = get_claim_dir(claim_id)
+    dest_pdf = claim_dir / "policy.pdf"
+
+    shutil.copyfile(SAMPLE_POLICY_PATH, dest_pdf)
+
+    try:
+        ingest_stats = rag_engine.ingest_policy(claim_id, dest_pdf)
+        claim.has_policy_pdf = True
+        claim.policy_pdf_path = str(dest_pdf)
+        claim.status = ClaimStatus.policy_indexed
+        await db.commit()
+        await db.refresh(claim)
+
+        return {
+            "status": "success",
+            "message": "Sample ISO HO-3 policy loaded and indexed in vector store.",
+            "ingest_stats": ingest_stats,
+            "claim": claim,
+        }
+    except Exception as e:
+        log.error("load_sample_policy_error", claim_id=claim_id, error=str(e))
+        claim.status = ClaimStatus.failed
+        claim.error_message = f"Sample policy indexing failed: {str(e)}"
+        await db.commit()
+        raise HTTPException(status_code=500, detail=f"Failed to index sample policy: {str(e)}")
+
 
 
 @router.post("/{claim_id}/policy/analyze")

@@ -25,6 +25,9 @@
       <span>FloorPlan Pipeline</span>
     </div>
     <div class="header-actions">
+      <button id="seedDemoHeaderBtn" class="btn btn-demo-pill" title="1-Click: Seed 3D Scan, HO-3 Policy, & Claim for end-to-end testing">
+        🚀 1-Click Complete Demo
+      </button>
       <div class="server-config">
         <label for="serverUrl">Server:</label>
         <input id="serverUrl" type="text" value="http://localhost:8000" placeholder="http://192.168.1.10:8000" />
@@ -45,6 +48,7 @@
         <input id="jobIdInput" type="text" placeholder="Paste job UUID…" />
       </div>
       <button id="loadBtn" class="btn btn-primary">Load Results</button>
+      <button id="loadDemoJobBtn" type="button" class="btn btn-secondary" style="margin-top: 6px; font-size: 0.75rem; padding: 6px 10px; width: 100%;">💡 Use Sample 3D Scan</button>
     </section>
 
     <!-- Job summary (hidden until loaded) -->
@@ -113,7 +117,10 @@
 
       <!-- Policy PDF Upload Dropzone -->
       <div class="field">
-        <label>Policy PDF (HO-3 / HO-5)</label>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+          <label style="margin-bottom: 0;">Policy PDF (HO-3 / HO-5)</label>
+          <button id="loadSamplePolicyBtn" type="button" class="btn-text-link" title="Attach and index bundled 22-page ISO HO-3 policy fixture">📄 Load Sample HO-3</button>
+        </div>
         <div id="policyDropzone" class="dropzone">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -121,7 +128,7 @@
             <line x1="12" y1="18" x2="12" y2="12"/>
             <line x1="9" y1="15" x2="15" y2="15"/>
           </svg>
-          <span id="policyDropzoneText">Drop Policy PDF here</span>
+          <span id="policyDropzoneText">Drop Policy PDF here or click</span>
           <input type="file" id="policyFileInput" accept="application/pdf" class="hidden" />
         </div>
       </div>
@@ -171,6 +178,63 @@
     <!-- Insurance Claim View -->
     <div id="tabClaim" class="tab-content hidden">
       <div class="claim-view-container">
+
+        <!-- Closed-Loop Testing & Verification Suite -->
+        <div class="test-suite-panel" id="testSuitePanel">
+          <div class="test-suite-header">
+            <div class="test-suite-title">
+              <span class="live-dot"></span>
+              <strong>Closed-Loop System Test Suite</strong>
+              <span class="badge badge-info">100% Client-Side Interactive</span>
+            </div>
+            <div class="test-suite-actions">
+              <button id="runAutoTestBtn" class="btn btn-accent btn-sm" title="Execute automated sequence: 3D Scan → RAG → Coverage → Cost → Chat">▶ Run Full Pipeline Test</button>
+            </div>
+          </div>
+          <div class="test-steps-grid">
+            <div class="test-step" id="testStepGeometry">
+              <div class="test-step-header">
+                <span class="step-num">1</span>
+                <span class="step-title">3D Scan Geometry</span>
+                <span class="step-status-badge badge badge-neutral" id="stepBadgeGeometry">Not Linked</span>
+              </div>
+              <div class="step-desc" id="stepDescGeometry">Link a 3D reconstruction job to supply physical wall & room area data.</div>
+            </div>
+            <div class="test-step" id="testStepPolicy">
+              <div class="test-step-header">
+                <span class="step-num">2</span>
+                <span class="step-title">Policy Ingestion (RAG)</span>
+                <span class="step-status-badge badge badge-neutral" id="stepBadgePolicy">No Policy</span>
+              </div>
+              <div class="step-desc" id="stepDescPolicy">Upload or load sample ISO HO-3 policy into ChromaDB vector store.</div>
+            </div>
+            <div class="test-step" id="testStepAnalysis">
+              <div class="test-step-header">
+                <span class="step-num">3</span>
+                <span class="step-title">Coverage Analysis</span>
+                <span class="step-status-badge badge badge-neutral" id="stepBadgeAnalysis">Pending</span>
+              </div>
+              <div class="step-desc" id="stepDescAnalysis">Analyze claimed loss against policy perils, deductibles, & exclusions.</div>
+            </div>
+            <div class="test-step" id="testStepCost">
+              <div class="test-step-header">
+                <span class="step-num">4</span>
+                <span class="step-title">Itemized Cost Engine</span>
+                <span class="step-status-badge badge badge-neutral" id="stepBadgeCost">Pending</span>
+              </div>
+              <div class="step-desc" id="stepDescCost">Scope repairs using 3D dimensions & compute deterministic rate payouts.</div>
+            </div>
+            <div class="test-step" id="testStepChat">
+              <div class="test-step-header">
+                <span class="step-num">5</span>
+                <span class="step-title">Multi-Intent Chat</span>
+                <span class="step-status-badge badge badge-neutral" id="stepBadgeChat">Ready</span>
+              </div>
+              <div class="step-desc" id="stepDescChat">Test live questions routed to POLICY, COST, GEOMETRY, or GENERAL.</div>
+            </div>
+          </div>
+        </div>
+
         <div class="claim-cards-row">
           <!-- Policy Coverage Analysis Card -->
           <div class="claim-card" id="policyAnalysisCard">
@@ -209,6 +273,17 @@
               </div>
             </div>
           </div>
+
+          <!-- Quick Test Prompt Chips -->
+          <div class="chat-prompt-chips">
+            <span class="chips-label">Quick Test Prompts:</span>
+            <button class="prompt-chip" data-prompt="Is water damage from a burst pipe covered under this policy?">🛡️ [Policy] Burst pipe covered?</button>
+            <button class="prompt-chip" data-prompt="Does the policy cover frozen pipes if heat was turned off?">❄️ [Policy] Frozen pipe exclusion?</button>
+            <button class="prompt-chip" data-prompt="What is the total estimated repair cost for drywall and hardwood flooring?">💰 [Cost] Repair cost breakdown?</button>
+            <button class="prompt-chip" data-prompt="What are the exact room dimensions and wall lengths from the 3D scan?">📐 [Geometry] 3D room dimensions?</button>
+            <button class="prompt-chip" data-prompt="What are my duties after experiencing a loss under Section I?">📋 [General] Duties after loss?</button>
+          </div>
+
           <div class="chat-input-bar">
             <input type="text" id="chatInput" placeholder="e.g. Is water damage covered under my policy? Or how much will drywall repair cost?" />
             <button id="sendChatBtn" class="btn btn-primary">Send</button>
