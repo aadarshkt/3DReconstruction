@@ -362,32 +362,8 @@ export default function UploadSection({
         </div>
       )}
 
-      {/* SPATIAL VIEWER: Renders clean empty state when no scanData is active */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-mono uppercase tracking-wider text-[var(--accent)] font-semibold">
-            Interactive Visual Output
-          </span>
-          <span className="text-[11px] font-mono text-[var(--text-muted)]">
-            {scanData ? `active dataset: ${isDemo ? "sample preview" : scanData.tier}` : "no active scan"}
-          </span>
-        </div>
-
-        <SpatialViewer
-          jobId={jobId}
-          areaM2={scanData?.areaM2 || 0}
-          wallsCount={scanData?.wallsCount || 0}
-          errorEst={scanData?.errorEst || "±2.5 cm"}
-          tier={scanData?.tier || "no active scan"}
-          plyUrl={scanData?.plyUrl}
-          svgRaw={scanData?.svgContent}
-          hasData={scanData !== null}
-          isDemo={isDemo}
-        />
-      </div>
-
       {/* Upload Dropzone Section */}
-      <div className="space-y-4 pt-4 border-t" style={{ borderColor: "var(--border-subtle)" }}>
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
           <span className="font-serif text-lg font-semibold text-[var(--text-primary)]">
             Upload Property Footage
@@ -473,6 +449,30 @@ export default function UploadSection({
             </div>
           )}
         </div>
+      </div>
+
+      {/* SPATIAL VIEWER: Renders clean empty state when no scanData is active */}
+      <div className="space-y-2 pt-6 border-t" style={{ borderColor: "var(--border-subtle)" }}>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-mono uppercase tracking-wider text-[var(--accent)] font-semibold">
+            Interactive Visual Output
+          </span>
+          <span className="text-[11px] font-mono text-[var(--text-muted)]">
+            {scanData ? `active dataset: ${isDemo ? "sample preview" : scanData.tier}` : "no active scan"}
+          </span>
+        </div>
+
+        <SpatialViewer
+          jobId={jobId}
+          areaM2={scanData?.areaM2 || 0}
+          wallsCount={scanData?.wallsCount || 0}
+          errorEst={scanData?.errorEst || "±2.5 cm"}
+          tier={scanData?.tier || "no active scan"}
+          plyUrl={scanData?.plyUrl}
+          svgRaw={scanData?.svgContent}
+          hasData={scanData !== null}
+          isDemo={isDemo}
+        />
       </div>
     </div>
   );
