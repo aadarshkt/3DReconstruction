@@ -504,4 +504,26 @@ canvas { display: block; width: 100% !important; height: 100% !important; }
   color: white; transform: translateY(-1px);
 }
 
+/* Ensure all clickable elements display the hand pointer */
+button,
+a,
+[role="button"],
+.tab,
+.dropzone,
+.btn,
+select,
+label,
+input[type="button"],
+input[type="submit"] {
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+
 

@@ -1,0 +1,118 @@
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --bg-page: #FAF9F5;
+  --bg-surface: #F5F2EB;
+  --bg-card: #FFFFFF;
+  --bg-card-subtle: #FAF8F3;
+  --border-subtle: #ECE7DE;
+  --border-default: #E2DBD0;
+  --border-strong: #C8C0B3;
+  --text-primary: #1F1E1D;
+  --text-secondary: #666159;
+  --text-muted: #918B82;
+  --accent: #C96442;
+  --accent-hover: #B85535;
+  --accent-subtle: rgba(201, 100, 66, 0.08);
+  --accent-ring: rgba(201, 100, 66, 0.25);
+  --badge-bg: #F0ECE4;
+  --badge-text: #4A453E;
+  --shadow-card: 0 1px 3px rgba(31, 30, 29, 0.04), 0 6px 18px rgba(31, 30, 29, 0.03);
+  --shadow-button: 0 1px 2px rgba(31, 30, 29, 0.06);
+
+  --font-serif: 'Newsreader', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.dark {
+  --bg-page: #181716;
+  --bg-surface: #21201D;
+  --bg-card: #272522;
+  --bg-card-subtle: #1E1D1B;
+  --border-subtle: #33302A;
+  --border-default: #3F3C36;
+  --border-strong: #5A554D;
+  --text-primary: #FAF9F5;
+  --text-secondary: #A6A097;
+  --text-muted: #78726A;
+  --accent: #E28362;
+  --accent-hover: #EC9577;
+  --accent-subtle: rgba(226, 131, 98, 0.12);
+  --accent-ring: rgba(226, 131, 98, 0.3);
+  --badge-bg: #2F2C27;
+  --badge-text: #D1CAC0;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.22);
+  --shadow-button: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+body {
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+.font-sans {
+  font-family: var(--font-sans);
+}
+
+/* Claude Console style button squish effect */
+.btn-squish {
+  transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.15s ease,
+              border-color 0.15s ease,
+              box-shadow 0.15s ease;
+}
+
+.btn-squish:active {
+  transform: scale(0.975);
+}
+
+/* Subtle custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+/* Ensure all clickable elements display the hand pointer */
+button,
+a,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+input[type="checkbox"],
+input[type="radio"],
+select,
+label,
+.btn-squish,
+.clickable {
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
