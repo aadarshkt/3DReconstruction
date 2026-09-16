@@ -17,16 +17,20 @@ interface SpatialViewerProps {
   tier?: string;
   plyUrl?: string;
   svgRaw?: string;
+  hasData?: boolean;
+  isDemo?: boolean;
 }
 
 export default function SpatialViewer({
-  jobId = "demo-spatial-job",
-  areaM2 = 24.5,
-  wallsCount = 4,
+  jobId = null,
+  areaM2 = 0,
+  wallsCount = 0,
   errorEst = "±2.5 cm",
   tier = "Native LiDAR (Apple RoomPlan)",
   plyUrl,
   svgRaw,
+  hasData = false,
+  isDemo = false,
 }: SpatialViewerProps) {
   const [activeTab, setActiveTab] = useState<"floorplan" | "pointcloud">("floorplan");
 
@@ -80,9 +84,21 @@ export default function SpatialViewer({
           </button>
         </div>
 
-        {/* Quick format tags */}
-        <div className="flex items-center gap-2 text-[11px] font-mono text-[var(--text-muted)]">
-          <span className="hidden sm:inline">Reconstruction:</span>
+        {/* Status / format tags */}
+        <div className="flex items-center gap-2 text-[11px] font-mono">
+          {hasData && (
+            <span
+              className="px-2 py-0.5 rounded border text-xs"
+              style={{
+                borderColor: isDemo ? "var(--border-default)" : "var(--accent-subtle)",
+                color: isDemo ? "var(--text-muted)" : "var(--accent)",
+                backgroundColor: "var(--bg-surface)",
+              }}
+            >
+              {isDemo ? "sample preview" : "live reconstruction"}
+            </span>
+          )}
+          <span className="hidden sm:inline text-[var(--text-muted)]">Reconstruction:</span>
           <span className="px-2 py-0.5 rounded border text-[var(--accent)] font-semibold" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-subtle)" }}>
             SVG
           </span>
@@ -97,7 +113,24 @@ export default function SpatialViewer({
 
       {/* Main Canvas Area */}
       <div className="px-5">
-        {activeTab === "floorplan" ? (
+        {!hasData ? (
+          activeTab === "floorplan" ? (
+            <div className="relative w-full h-[380px] sm:h-[440px] rounded-xl border flex flex-col items-center justify-center p-6 text-center bg-[#181716] border-[var(--border-subtle)]">
+              <svg className="w-16 h-16 text-[var(--border-strong)] mb-3" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="8" y="8" width="32" height="32" rx="4" strokeDasharray="4 3" />
+                <path d="M8 20h32M20 8v32" strokeDasharray="2 2" strokeOpacity="0.5" />
+              </svg>
+              <p className="text-sm font-medium text-[var(--text-primary)] font-serif">
+                No 2D floor plan loaded
+              </p>
+              <p className="text-xs text-[var(--text-muted)] mt-1 max-w-sm">
+                Upload room photos, video, or iPhone LiDAR to generate 2D drawings and wall lengths, or load sample room scan.
+              </p>
+            </div>
+          ) : (
+            <PointcloudViewer plyUrl={plyUrl} hasScan={false} />
+          )
+        ) : activeTab === "floorplan" ? (
           <div className="relative w-full h-[400px] sm:h-[460px] rounded-xl border flex items-center justify-center p-4 overflow-hidden bg-[#181716]">
             {svgRaw ? (
               <div
@@ -187,6 +220,11 @@ export default function SpatialViewer({
             <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded text-[11px] font-mono text-[#a6a097] border border-white/10">
               Hover walls for linear lengths · 2D SVG Projection
             </div>
+            {isDemo && (
+              <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2.5 py-0.5 rounded text-[10px] font-mono text-[#a6a097] border border-white/10">
+                sample preview
+              </div>
+            )}
           </div>
         ) : (
           <PointcloudViewer plyUrl={plyUrl} hasScan={true} />
@@ -198,28 +236,28 @@ export default function SpatialViewer({
         <div className="p-3 rounded-xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
           <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)]">Floor Area</div>
           <div className="text-sm font-semibold text-[var(--text-primary)] mt-0.5 font-serif">
-            {areaM2} m² ({(areaM2 * 10.764).toFixed(1)} sq ft)
+            {hasData ? `${areaM2} m² (${(areaM2 * 10.764).toFixed(1)} sq ft)` : "--"}
           </div>
         </div>
 
         <div className="p-3 rounded-xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
           <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)]">Wall Segments</div>
           <div className="text-sm font-semibold text-[var(--text-primary)] mt-0.5 font-serif">
-            {wallsCount} Verified Segments
+            {hasData ? `${wallsCount} Verified Segments` : "--"}
           </div>
         </div>
 
         <div className="p-3 rounded-xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
           <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)]">Dimensional Error</div>
           <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5 font-serif">
-            {errorEst}
+            {hasData ? errorEst : "--"}
           </div>
         </div>
 
         <div className="p-3 rounded-xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
           <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)]">Source</div>
           <div className="text-sm font-semibold text-[var(--text-primary)] mt-0.5 truncate font-serif">
-            {tier}
+            {hasData ? (isDemo ? "sample (roomplan)" : tier) : "no active scan"}
           </div>
         </div>
       </div>

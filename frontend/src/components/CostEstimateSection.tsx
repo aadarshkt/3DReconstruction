@@ -15,16 +15,22 @@ interface CostLineItem {
 interface CostEstimateSectionProps {
   claimId: string | null;
   policyDeductible?: number;
+  jobData?: any | null;
+  isProcessing?: boolean;
+  isDemo?: boolean;
+  onNavigateTab?: (tab: "footage" | "policy" | "costs" | "assistant") => void;
 }
 
 export default function CostEstimateSection({
   claimId,
   policyDeductible = 1000,
+  jobData = null,
+  isProcessing = false,
+  isDemo = false,
+  onNavigateTab,
 }: CostEstimateSectionProps) {
   const [overheadProfitPct, setOverheadProfitPct] = useState(10);
   const [deductible, setDeductible] = useState(policyDeductible);
-  const [roomAreaM2] = useState(24.5);
-  const [wallPerimeterM] = useState(19.8);
 
   useEffect(() => {
     if (policyDeductible) {
@@ -32,16 +38,25 @@ export default function CostEstimateSection({
     }
   }, [policyDeductible]);
 
+  const hasData = isDemo || (jobData && (jobData.areaM2 || jobData.room_area_m2));
+
+  // Dynamic geometry derived from 3D spatial scan or sample data
+  const roomAreaM2 = jobData?.areaM2 || jobData?.room_area_m2 || (isDemo ? 24.5 : 0);
+  const wallPerimeterM = jobData?.walls
+    ? jobData.walls.reduce((sum: number, w: any) => sum + (Number(w.length_m) || 0), 0)
+    : (isDemo ? 19.8 : 0);
+  const damageAreaM2 = jobData?.damageAreaM2 || (roomAreaM2 > 0 ? Number((roomAreaM2 * 0.74).toFixed(1)) : 0);
+
   // Deterministic Line Items computed from physical 3D scan
   const lineItems: CostLineItem[] = [
     {
       code: "WTR-EXT-01",
       category: "Water Remediation",
       description: "Emergency surface water extraction & containment barriers",
-      quantity: roomAreaM2,
+      quantity: damageAreaM2 || roomAreaM2,
       unit: "m²",
       unit_price: 32.5,
-      total: roomAreaM2 * 32.5,
+      total: (damageAreaM2 || roomAreaM2) * 32.5,
     },
     {
       code: "DRW-REM-02",
@@ -65,10 +80,10 @@ export default function CostEstimateSection({
       code: "FLR-OAK-04",
       category: "Flooring",
       description: "Remove buckled hardwood and install engineered White Oak plank",
-      quantity: roomAreaM2,
+      quantity: damageAreaM2 || roomAreaM2,
       unit: "m²",
       unit_price: 112.0,
-      total: roomAreaM2 * 112.0,
+      total: (damageAreaM2 || roomAreaM2) * 112.0,
     },
     {
       code: "PNT-WAL-05",
@@ -95,16 +110,103 @@ export default function CostEstimateSection({
   const grossTotal = subtotal + overheadAndProfit;
   const netPayout = Math.max(0, grossTotal - deductible);
 
+  // 1. Processing state view
+  if (isProcessing) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4" style={{ borderColor: "var(--border-subtle)" }}>
+          <div>
+            <h2 className="font-serif text-2xl font-medium tracking-tight text-[var(--text-primary)]">
+              Cost Calculation & Repair Estimate
+            </h2>
+            <p className="text-xs text-[var(--text-secondary)] mt-1">
+              Itemized repair schedule mapped directly to 3D spatial dimensions and regional insurance rate tables.
+            </p>
+          </div>
+          <span className="px-2.5 py-1 text-xs font-mono rounded border text-[var(--text-muted)] border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+            processing scan
+          </span>
+        </div>
+
+        <div className="rounded-2xl border p-10 text-center space-y-3 bg-[var(--bg-surface)] border-[var(--border-subtle)]">
+          <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-default)] font-mono text-xs text-[var(--accent)] animate-pulse">
+            ...
+          </div>
+          <h3 className="font-serif text-xl font-medium text-[var(--text-primary)]">
+            Spatial Processing in Progress
+          </h3>
+          <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto leading-relaxed">
+            3D reconstruction is calculating wall boundaries and damage area. You can return after processing finishes to review your certified itemized estimate.
+          </p>
+          <div className="pt-2">
+            <button
+              onClick={() => onNavigateTab?.("policy")}
+              className="btn-squish inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--border-default)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-all"
+            >
+              Proceed to Insurance Policy Documents →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Empty state view
+  if (!hasData) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4" style={{ borderColor: "var(--border-subtle)" }}>
+          <div>
+            <h2 className="font-serif text-2xl font-medium tracking-tight text-[var(--text-primary)]">
+              Cost Calculation & Repair Estimate
+            </h2>
+            <p className="text-xs text-[var(--text-secondary)] mt-1">
+              Itemized repair schedule mapped directly to 3D spatial dimensions and regional insurance rate tables.
+            </p>
+          </div>
+          <span className="px-2.5 py-1 text-xs font-mono rounded border text-[var(--text-muted)] border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+            no scan loaded
+          </span>
+        </div>
+
+        <div className="rounded-2xl border p-10 text-center space-y-3 bg-[var(--bg-surface)] border-[var(--border-subtle)]">
+          <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-default)] font-mono text-xs text-[var(--text-muted)]">
+            $
+          </div>
+          <h3 className="font-serif text-xl font-medium text-[var(--text-primary)]">
+            No Cost Estimate Generated
+          </h3>
+          <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto leading-relaxed">
+            Repair costs are calculated automatically once physical room dimensions and wall segments are reconstructed from footage.
+          </p>
+          <div className="pt-2 flex items-center justify-center gap-3">
+            <button
+              onClick={() => onNavigateTab?.("footage")}
+              className="btn-squish px-3.5 py-1.5 text-xs font-medium rounded-lg border border-[var(--border-default)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-all"
+            >
+              Go to Step 1: Property Footage →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4" style={{ borderColor: "var(--border-subtle)" }}>
         <div>
-          <h2 className="font-serif text-2xl font-medium tracking-tight text-[var(--text-primary)]">
-            Cost Calculation & Repair Estimate
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-serif text-2xl font-medium tracking-tight text-[var(--text-primary)]">
+              Cost Calculation & Repair Estimate
+            </h2>
+            <span className="px-2 py-0.5 rounded text-[11px] font-mono border border-[var(--border-subtle)] text-[var(--text-muted)] bg-[var(--bg-surface)]">
+              {isDemo ? "sample estimate" : "live estimate"}
+            </span>
+          </div>
           <p className="text-xs text-[var(--text-secondary)] mt-1">
-            Itemized repair schedule mapped directly to 3D spatial dimensions and regional insurance rate tables.
+            Itemized repair schedule mapped directly to {roomAreaM2} m² measured area ({wallPerimeterM.toFixed(1)} m wall perimeter).
           </p>
         </div>
 

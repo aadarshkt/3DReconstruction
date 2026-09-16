@@ -22,6 +22,7 @@ interface PolicySectionProps {
   setIsLoading: (val: boolean) => void;
   statusMessage: string;
   setStatusMessage: (msg: string) => void;
+  isDemo?: boolean;
 }
 
 export default function PolicySection({
@@ -31,6 +32,7 @@ export default function PolicySection({
   setIsLoading,
   statusMessage,
   setStatusMessage,
+  isDemo = false,
 }: PolicySectionProps) {
   const [policyUploaded, setPolicyUploaded] = useState(false);
   const [analysis, setAnalysis] = useState<PolicyAnalysis | null>(null);
@@ -155,9 +157,16 @@ export default function PolicySection({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4" style={{ borderColor: "var(--border-subtle)" }}>
         <div>
-          <h2 className="font-serif text-2xl font-medium tracking-tight text-[var(--text-primary)]">
-            Insurance Documents & Policy Terms
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-serif text-2xl font-medium tracking-tight text-[var(--text-primary)]">
+              Insurance Documents & Policy Terms
+            </h2>
+            {policyUploaded && (
+              <span className="px-2 py-0.5 rounded text-[11px] font-mono border border-[var(--border-subtle)] text-[var(--text-muted)] bg-[var(--bg-surface)]">
+                {isDemo ? "sample policy (iso ho-3)" : "verified policy document"}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-[var(--text-secondary)] mt-1">
             Attach your homeowner or commercial policy PDF to extract perils, deductibles, limits, and exclusions.
           </p>
@@ -172,7 +181,6 @@ export default function PolicySection({
             borderColor: "var(--border-default)",
           }}
         >
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]"></span>
           Attach Sample ISO HO-3 Policy
         </button>
       </div>

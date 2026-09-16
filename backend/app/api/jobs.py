@@ -85,6 +85,7 @@ class JobStatusResponse(BaseModel):
     tier: Tier
     status: JobStatus
     progress_pct: int
+    is_demo: bool = False
     scale_reference_m: Optional[float]
     room_area_m2: Optional[float]
     wall_count: Optional[int]
@@ -228,6 +229,7 @@ def _to_response(job: Job) -> JobStatusResponse:
         tier=job.tier,
         status=job.status,
         progress_pct=job.progress_pct,
+        is_demo=bool(job.is_demo),
         scale_reference_m=job.scale_reference_m,
         room_area_m2=job.room_area_m2,
         wall_count=job.wall_count,

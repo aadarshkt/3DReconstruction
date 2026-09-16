@@ -17,7 +17,7 @@ from app.config import get_claim_dir, settings
 from app.demo import seed_demo_pipeline, SAMPLE_POLICY_PATH
 from app.main import get_db
 from app.models.claim import Claim, ClaimStatus
-from app.models.job import Job
+from app.models.job import Job, JobStatus
 import shutil
 
 log = structlog.get_logger()
@@ -365,13 +365,21 @@ async def estimate_claim_costs(
     reconstruction_metrics = None
     if claim.job_id:
         job = await db.get(Job, claim.job_id)
-        if job and job.result_payload:
-            reconstruction_metrics = {
-                "room_area_m2": job.room_area_m2,
-                "wall_count": job.wall_count,
-                "walls": job.result_payload.get("walls", []),
-                "damage_area_m2": job.result_payload.get("damage_area_m2"),
-            }
+        if job:
+            if job.status not in (JobStatus.complete, JobStatus.failed):
+                return {
+                    "status": "processing",
+                    "message": "3D spatial reconstruction is still processing. Geometry, perimeter, and surface areas are being measured. Please check back shortly for your itemized cost estimate.",
+                    "job_status": job.status.value,
+                    "job_progress": job.progress_pct,
+                }
+            if job.result_payload:
+                reconstruction_metrics = {
+                    "room_area_m2": job.room_area_m2,
+                    "wall_count": job.wall_count,
+                    "walls": job.result_payload.get("walls", []),
+                    "damage_area_m2": job.result_payload.get("damage_area_m2"),
+                }
 
     claim.status = ClaimStatus.estimating_costs
     await db.commit()

@@ -74,11 +74,13 @@ export default function PointcloudViewer({ plyUrl, hasScan }: PointcloudViewerPr
         },
         undefined,
         () => {
-          // Fallback to procedural demo room point cloud
-          createDemoRoomPointCloud(scene);
+          // Fallback to procedural demo room point cloud if scan was expected
+          if (hasScan) {
+            createDemoRoomPointCloud(scene);
+          }
         }
       );
-    } else {
+    } else if (hasScan) {
       createDemoRoomPointCloud(scene);
     }
 
@@ -172,7 +174,9 @@ export default function PointcloudViewer({ plyUrl, hasScan }: PointcloudViewerPr
       <div ref={mountRef} className="w-full h-full" />
       <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[11px] text-[#A6A097] bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10">
         <span>Click & drag to rotate · Scroll to zoom · Right-click to pan</span>
-        <span className="font-mono text-[#D97757]">Interactive 3D Dense Cloud</span>
+        <span className="font-mono text-[#D97757]">
+          {hasScan || plyUrl ? "Interactive 3D Dense Cloud" : "Scene Ready · No Scan Loaded"}
+        </span>
       </div>
     </div>
   );

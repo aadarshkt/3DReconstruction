@@ -20,13 +20,13 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+log = structlog.get_logger()
+router = APIRouter()
+
 from app.config import settings, get_images_dir, get_job_dir
 from app.models.job import Job, JobStatus, Tier
 from app.main import get_db
 from app.tasks.celery_tasks import run_pipeline
-
-log = structlog.get_logger()
-router = APIRouter()
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
 class ChunkUploadRequest(BaseModel):
@@ -42,40 +42,174 @@ class StartJobResponse(BaseModel):
     message: str
 
 
-# ── Upload: all-at-once (photos / small video / USDZ) ─────────────────────────
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".heic", ".webp", ".bmp", ".tiff"}
+VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".m4v"}
+LIDAR_EXTS = {".usdz", ".ply", ".json", ".las", ".laz", ".e57"}
+
+
+def _classify_filename(filename: str) -> str:
+    ext = Path(filename).suffix.lower()
+    if ext in IMAGE_EXTS:
+        return "image"
+    if ext in VIDEO_EXTS:
+        return "video"
+    if ext in LIDAR_EXTS:
+        return "lidar"
+    return "other"
+
+
+async def _save_single_file(job_id: str, upload: UploadFile) -> tuple[str, str]:
+    """Save upload to appropriate directory based on file extension and return (dest_path, modality)."""
+    safe_name = _safe_filename(upload.filename or "file")
+    modality = _classify_filename(safe_name)
+
+    if modality in ("image", "video"):
+        dest_dir = get_images_dir(job_id)
+    else:
+        dest_dir = get_job_dir(job_id)
+
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / safe_name
+    async with aiofiles.open(dest, "wb") as f:
+        while chunk := await upload.read(1024 * 1024):  # 1 MB buffer
+            await f.write(chunk)
+
+    # For videos, also copy to job_dir if required by tier_router / tier_a_b
+    if modality == "video":
+        video_in_job_dir = get_job_dir(job_id) / safe_name
+        if not video_in_job_dir.exists():
+            try:
+                shutil.copyfile(dest, video_in_job_dir)
+            except Exception:
+                pass
+
+    log.info("file_saved", job_id=job_id, path=str(dest), modality=modality)
+    return str(dest), modality
+
+
+# ── Upload: all-at-once (multi-modal support) ──────────────────────────────────
 @router.post("/{job_id}/upload", status_code=200)
 async def upload_files(
     job_id: str,
-    files: List[UploadFile] = File(..., description="One or more files to upload"),
-    tier: Optional[str] = Form(None, description="Override tier (photos|video|lidar)"),
+    files: List[UploadFile] = File(..., description="One or more files to upload (photos, video, and/or LiDAR)"),
+    tier: Optional[str] = Form(None, description="Optional tier override (photos|video|lidar|hybrid)"),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Upload files for a job in a single multipart request.
+    Supports multi-modal files simultaneously:
+    - Photos (.jpg, .png, .heic)
+    - Video (.mp4, .mov)
+    - LiDAR (.usdz, .ply, .json)
 
-    - **Tier A (photos)**: send all JPEGs as multiple `files` parts.
-    - **Tier B (video)**:  send a single MP4 as one `files` part.
-    - **Tier C (LiDAR)**:  send the `.usdz` or RoomPlan JSON as one `files` part.
+    If both visual media and LiDAR files are uploaded, the job is auto-promoted to 'hybrid'.
     """
     job = await _get_or_404(job_id, db)
     _assert_uploadable(job)
 
-    dest_dir = get_images_dir(job_id) if job.tier in (Tier.photos, Tier.video) else get_job_dir(job_id)
     saved: list[str] = []
+    modalities_seen: set[str] = set()
 
     for upload in files:
-        safe_name = _safe_filename(upload.filename or "file")
-        dest = dest_dir / safe_name
-        async with aiofiles.open(dest, "wb") as f:
-            while chunk := await upload.read(1024 * 1024):  # 1 MB read buffer
-                await f.write(chunk)
-        saved.append(str(dest))
-        log.info("file_saved", job_id=job_id, path=str(dest))
+        dest_str, mod = await _save_single_file(job_id, upload)
+        saved.append(dest_str)
+        modalities_seen.add(mod)
+
+    # Determine / auto-promote tier
+    has_visual = bool(modalities_seen.intersection({"image", "video"}))
+    has_lidar = "lidar" in modalities_seen
+
+    if tier and tier in [t.value for t in Tier]:
+        job.tier = Tier(tier)
+    elif has_visual and has_lidar:
+        job.tier = Tier.hybrid
+    elif has_lidar and not has_visual:
+        job.tier = Tier.lidar
+    elif "video" in modalities_seen and "image" not in modalities_seen:
+        job.tier = Tier.video
+    elif "image" in modalities_seen:
+        job.tier = Tier.photos
 
     job.status = JobStatus.uploading
     await db.commit()
+    await db.refresh(job)
 
-    return {"job_id": job_id, "saved_files": saved, "count": len(saved)}
+    return {
+        "job_id": job_id,
+        "tier": job.tier.value,
+        "saved_files": saved,
+        "count": len(saved),
+        "modalities": list(modalities_seen),
+    }
+
+
+# ── Unified: Create Job + Upload Files in 1 call ──────────────────────────────
+@router.post("/create-and-upload", status_code=201)
+async def create_and_upload(
+    files: List[UploadFile] = File(..., description="One or more capture files"),
+    scale_reference_m: Optional[float] = Form(None, description="Optional scale reference length in metres"),
+    auto_start: bool = Form(False, description="Whether to enqueue reconstruction immediately"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Unified multi-modal endpoint:
+    1. Creates a new Job
+    2. Ingests all uploaded files (photos, video, LiDAR)
+    3. Auto-determines Tier (photos, video, lidar, or hybrid)
+    4. Optionally starts pipeline immediately
+    """
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided.")
+
+    # Create placeholder job
+    job = Job(tier=Tier.photos, scale_reference_m=scale_reference_m)
+    db.add(job)
+    await db.commit()
+    await db.refresh(job)
+
+    saved: list[str] = []
+    modalities_seen: set[str] = set()
+
+    for upload in files:
+        dest_str, mod = await _save_single_file(job.id, upload)
+        saved.append(dest_str)
+        modalities_seen.add(mod)
+
+    # Auto-resolve tier
+    has_visual = bool(modalities_seen.intersection({"image", "video"}))
+    has_lidar = "lidar" in modalities_seen
+
+    if has_visual and has_lidar:
+        job.tier = Tier.hybrid
+    elif has_lidar:
+        job.tier = Tier.lidar
+    elif "video" in modalities_seen:
+        job.tier = Tier.video
+    else:
+        job.tier = Tier.photos
+
+    job.status = JobStatus.uploading
+    await db.commit()
+    await db.refresh(job)
+
+    celery_task_id = None
+    if auto_start:
+        task = run_pipeline.delay(job.id)
+        job.celery_task_id = task.id
+        job.status = JobStatus.queued
+        await db.commit()
+        await db.refresh(job)
+        celery_task_id = task.id
+
+    return {
+        "job_id": job.id,
+        "tier": job.tier.value,
+        "status": job.status.value,
+        "saved_files": saved,
+        "count": len(saved),
+        "modalities": list(modalities_seen),
+        "celery_task_id": celery_task_id,
+    }
 
 
 # ── Upload: chunked (large videos / dense photo sets) ─────────────────────────

@@ -37,9 +37,9 @@ export default function WalkthroughModal({
       subtitle: "Step 2 of 5 · Media Ingestion",
       tabTarget: "footage",
       content:
-        "Here, you can upload room photos, a walkthrough video, or an iPhone LiDAR export. You may also test the pipeline instantly with a single click using our verified sample room scan.",
+        "Here, you can upload room photos, a walkthrough video, or an iPhone LiDAR export. When starting fresh, your workspace remains clean. You can load a sample 3D scan anytime to explore interactive drawings and 3D models.",
       highlightText:
-        "Physical wall dimensions, room area, and surface geometry are computed automatically.",
+        "Sample preview datasets are labeled distinctively, keeping your own property claims separate.",
     },
     {
       title: "Insurance Policy Documents",

@@ -161,6 +161,7 @@ async def seed_demo_pipeline(db: AsyncSession, rag_engine) -> dict:
         job = Job(
             id=DEMO_JOB_ID,
             tier=Tier.lidar,
+            is_demo=True,
             room_area_m2=24.5,
             wall_count=4,
             status=JobStatus.complete,
@@ -168,6 +169,7 @@ async def seed_demo_pipeline(db: AsyncSession, rag_engine) -> dict:
         )
         db.add(job)
     else:
+        job.is_demo = True
         job.status = JobStatus.complete
         job.room_area_m2 = 24.5
         job.wall_count = 4

@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import (
-    Column, String, Float, Integer, DateTime, Enum as SAEnum, Text, JSON
+    Column, String, Float, Integer, DateTime, Enum as SAEnum, Text, JSON, Boolean
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase
@@ -57,6 +57,7 @@ class Job(Base):
 
     # Input metadata
     tier: Tier = Column(SAEnum(Tier), nullable=False)
+    is_demo: bool = Column(Boolean, default=False, nullable=True)
     scale_reference_m: Optional[float] = Column(Float, nullable=True)
     """
     For Tier A / B: the real-world length (metres) of the reference object

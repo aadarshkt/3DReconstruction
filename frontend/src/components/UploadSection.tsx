@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import SpatialViewer from "./SpatialViewer";
 
 interface WallSegment {
@@ -9,13 +9,29 @@ interface WallSegment {
   has_opening?: boolean;
 }
 
+interface ScanData {
+  areaM2: number;
+  wallsCount: number;
+  errorEst: string;
+  tier: string;
+  walls: WallSegment[];
+  svgContent?: string;
+  plyUrl?: string;
+  damageAreaM2?: number;
+}
+
 interface UploadSectionProps {
   jobId: string | null;
-  onJobLoaded: (jobData: any) => void;
+  onJobLoaded: (jobData: any, isDemo?: boolean) => void;
   isLoading: boolean;
   setIsLoading: (val: boolean) => void;
   statusMessage: string;
   setStatusMessage: (msg: string) => void;
+  isProcessing?: boolean;
+  setIsProcessing?: (val: boolean) => void;
+  isDemo?: boolean;
+  jobData?: any | null;
+  onNavigateTab?: (tab: "footage" | "policy" | "costs" | "assistant") => void;
 }
 
 export default function UploadSection({
@@ -25,40 +41,77 @@ export default function UploadSection({
   setIsLoading,
   statusMessage,
   setStatusMessage,
+  isProcessing = false,
+  setIsProcessing,
+  isDemo = false,
+  jobData = null,
+  onNavigateTab,
 }: UploadSectionProps) {
   const [activeMediaTab, setActiveMediaTab] = useState<"photos" | "video" | "lidar">("photos");
   const [dragOver, setDragOver] = useState(false);
-  const [scanData, setScanData] = useState<{
-    areaM2: number;
-    wallsCount: number;
-    errorEst: string;
-    tier: string;
-    walls: WallSegment[];
-    svgContent?: string;
-    plyUrl?: string;
-  }>({
-    areaM2: 24.5,
-    wallsCount: 4,
-    errorEst: "±2.5 cm",
-    tier: "Native iPhone LiDAR (RoomPlan)",
-    walls: [
-      { id: 1, length_m: 5.4, has_opening: false },
-      { id: 2, length_m: 4.5, has_opening: true },
-      { id: 3, length_m: 5.4, has_opening: true },
-      { id: 4, length_m: 4.5, has_opening: false },
-    ],
-    plyUrl: "/static/a441e175-fa81-54b1-872f-532658f8b0fa/results/point_cloud.ply",
+  const [progressPct, setProgressPct] = useState(0);
+  const [progressStage, setProgressStage] = useState("");
+  const wsRef = useRef<WebSocket | null>(null);
+
+  // Initial scanData is null unless jobData is already provided or demo is active
+  const [scanData, setScanData] = useState<ScanData | null>(() => {
+    if (jobData && (jobData.areaM2 || jobData.room_area_m2)) {
+      return {
+        areaM2: jobData.areaM2 || jobData.room_area_m2,
+        wallsCount: jobData.wallsCount || jobData.wall_count || (jobData.walls?.length ?? 0),
+        errorEst: jobData.errorEst || "±2.5 cm",
+        tier: jobData.tier || "Native LiDAR (Apple RoomPlan)",
+        walls: jobData.walls || [],
+        svgContent: jobData.svgContent,
+        plyUrl: jobData.plyUrl,
+        damageAreaM2: jobData.damageAreaM2,
+      };
+    }
+    return null;
   });
+
+  // Sync scanData if jobData changes from parent
+  useEffect(() => {
+    if (jobData && (jobData.areaM2 || jobData.room_area_m2)) {
+      setScanData({
+        areaM2: jobData.areaM2 || jobData.room_area_m2,
+        wallsCount: jobData.wallsCount || jobData.wall_count || (jobData.walls?.length ?? 0),
+        errorEst: jobData.errorEst || "±2.5 cm",
+        tier: jobData.tier || "Native LiDAR (Apple RoomPlan)",
+        walls: jobData.walls || [],
+        svgContent: jobData.svgContent,
+        plyUrl: jobData.plyUrl,
+        damageAreaM2: jobData.damageAreaM2,
+      });
+    } else if (!jobData && !isDemo) {
+      setScanData(null);
+    }
+  }, [jobData, isDemo]);
+
+  // Clean up WebSocket on unmount
+  useEffect(() => {
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
 
   const handleSeedDemo = async () => {
     setIsLoading(true);
-    setStatusMessage("Seeding verified 3D LiDAR scan & room geometry...");
+    setStatusMessage("Loading sample 3D scan and room geometry...");
     try {
       const res = await fetch("/claims/seed-demo", { method: "POST" });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      
-      const newScan = {
+
+      let svgText: string | undefined = undefined;
+      try {
+        const svgRes = await fetch(`/jobs/${data.job_id}/files/floor_plan.svg`);
+        if (svgRes.ok) svgText = await svgRes.text();
+      } catch (_) {}
+
+      const newScan: ScanData = {
         areaM2: 24.5,
         wallsCount: 4,
         errorEst: "±2.5 cm",
@@ -69,15 +122,123 @@ export default function UploadSection({
           { id: 3, length_m: 5.4, has_opening: true },
           { id: 4, length_m: 4.5, has_opening: false },
         ],
-        svgContent: data.svg || undefined,
-        plyUrl: data.job_id ? `/static/${data.job_id}/point_cloud.ply` : undefined,
+        svgContent: svgText || data.svg || undefined,
+        plyUrl: data.job_id ? `/jobs/${data.job_id}/files/point_cloud.ply` : undefined,
+        damageAreaM2: 18.2,
       };
       setScanData(newScan);
-      onJobLoaded(data);
-      setStatusMessage("Verified 3D scan and floor plan loaded successfully.");
+      onJobLoaded({ ...data, ...newScan }, true);
+      setStatusMessage("Sample 3D scan and floor plan loaded.");
     } catch (e: any) {
+      // Fallback
+      const fallbackScan: ScanData = {
+        areaM2: 24.5,
+        wallsCount: 4,
+        errorEst: "±2.5 cm",
+        tier: "Native LiDAR (Apple RoomPlan)",
+        walls: [
+          { id: 1, length_m: 5.4, has_opening: false },
+          { id: 2, length_m: 4.5, has_opening: true },
+          { id: 3, length_m: 5.4, has_opening: true },
+          { id: 4, length_m: 4.5, has_opening: false },
+        ],
+        plyUrl: "/static/a441e175-fa81-54b1-872f-532658f8b0fa/results/point_cloud.ply",
+        damageAreaM2: 18.2,
+      };
+      setScanData(fallbackScan);
+      onJobLoaded({ job_id: "demo-job", ...fallbackScan }, true);
       setStatusMessage("Sample 3D scan loaded.");
     } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const connectProgressWebSocket = (activeJobId: string) => {
+    try {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const host = window.location.host;
+      const ws = new WebSocket(`${protocol}//${host}/jobs/${activeJobId}/ws`);
+      wsRef.current = ws;
+
+      ws.onmessage = async (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.pct != null) setProgressPct(msg.pct);
+          if (msg.stage) setProgressStage(msg.stage);
+
+          if (msg.stage === "complete" || msg.pct === 100) {
+            ws.close();
+            await fetchJobResults(activeJobId);
+          } else if (msg.stage === "failed") {
+            ws.close();
+            setIsProcessing?.(false);
+            setIsLoading(false);
+            setStatusMessage(`Reconstruction error: ${msg.error || "Processing failed"}`);
+          }
+        } catch (_) {}
+      };
+
+      ws.onerror = () => {
+        pollJobStatus(activeJobId);
+      };
+    } catch (_) {
+      pollJobStatus(activeJobId);
+    }
+  };
+
+  const pollJobStatus = (activeJobId: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/jobs/${activeJobId}`);
+        if (!res.ok) return;
+        const job = await res.json();
+        setProgressPct(job.progress_pct || 0);
+        setProgressStage(job.status || "");
+
+        if (job.status === "complete") {
+          clearInterval(interval);
+          await fetchJobResults(activeJobId);
+        } else if (job.status === "failed") {
+          clearInterval(interval);
+          setIsProcessing?.(false);
+          setIsLoading(false);
+          setStatusMessage("Reconstruction encountered an issue.");
+        }
+      } catch (_) {}
+    }, 3000);
+  };
+
+  const fetchJobResults = async (activeJobId: string) => {
+    try {
+      const res = await fetch(`/jobs/${activeJobId}/results`);
+      if (res.ok) {
+        const result = await res.json();
+        let svgText: string | undefined = undefined;
+        try {
+          const svgRes = await fetch(`/jobs/${activeJobId}/files/floor_plan.svg`);
+          if (svgRes.ok) svgText = await svgRes.text();
+        } catch (_) {}
+
+        const parsedScan: ScanData = {
+          areaM2: result.room_area_m2 || 0,
+          wallsCount: result.wall_count || (result.walls?.length ?? 0),
+          errorEst: result.error_estimate?.expected_wall_error_cm
+            ? `±${result.error_estimate.expected_wall_error_cm} cm`
+            : "±2.0 cm",
+          tier: result.tier === "hybrid" ? "Hybrid (Photos/Video + LiDAR)" : result.tier,
+          walls: result.walls || [],
+          svgContent: svgText,
+          plyUrl: `/jobs/${activeJobId}/files/point_cloud.ply`,
+          damageAreaM2: result.damage_area_m2,
+        };
+        setScanData(parsedScan);
+        onJobLoaded({ job_id: activeJobId, ...result, ...parsedScan }, false);
+        setStatusMessage("3D spatial reconstruction completed successfully.");
+      }
+    } catch (_) {
+      setStatusMessage("Reconstruction completed.");
+    } finally {
+      setIsProcessing?.(false);
       setIsLoading(false);
     }
   };
@@ -85,38 +246,54 @@ export default function UploadSection({
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setIsLoading(true);
-    setStatusMessage(`Uploading ${files.length} file(s) for 3D reconstruction...`);
+    setIsProcessing?.(true);
+    setProgressPct(5);
+    setProgressStage("uploading");
+    setStatusMessage(`Uploading ${files.length} file(s)...`);
 
     try {
-      // 1. Create Job
-      const createRes = await fetch("/jobs/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier: activeMediaTab }),
-      });
-      if (!createRes.ok) throw new Error(await createRes.text());
-      const job = await createRes.json();
-
-      // 2. Upload files
       const formData = new FormData();
       for (let i = 0; i < files.length; i++) {
         formData.append("files", files[i]);
       }
-      formData.append("tier", activeMediaTab);
+      formData.append("auto_start", "true");
 
-      const uploadRes = await fetch(`/jobs/${job.job_id}/upload`, {
+      const res = await fetch("/jobs/create-and-upload", {
         method: "POST",
         body: formData,
       });
-      if (!uploadRes.ok) throw new Error(await uploadRes.text());
 
-      setStatusMessage("Media uploaded. Processing 3D geometric reconstruction...");
-      onJobLoaded(job);
+      if (!res.ok) throw new Error(await res.text());
+      const job = await res.json();
+
+      setStatusMessage(`Media uploaded (${job.tier} modality). Running 3D reconstruction...`);
+      onJobLoaded(job, false);
+      connectProgressWebSocket(job.job_id);
     } catch (err: any) {
-      setStatusMessage(`Upload note: ${err.message}. Using sample geometry.`);
-      handleSeedDemo();
-    } finally {
-      setIsLoading(false);
+      // Fallback to separate create + upload
+      try {
+        const createRes = await fetch("/jobs/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tier: activeMediaTab }),
+        });
+        const job = await createRes.json();
+
+        const formData = new FormData();
+        for (let i = 0; i < files.length; i++) {
+          formData.append("files", files[i]);
+        }
+        await fetch(`/jobs/${job.job_id}/upload`, { method: "POST", body: formData });
+        await fetch(`/jobs/${job.job_id}/start`, { method: "POST" });
+
+        setStatusMessage("Processing 3D spatial reconstruction...");
+        onJobLoaded(job, false);
+        connectProgressWebSocket(job.job_id);
+      } catch (fallbackErr: any) {
+        setStatusMessage(`Upload note: ${fallbackErr.message}. You can also explore with sample data.`);
+        setIsProcessing?.(false);
+        setIsLoading(false);
+      }
     }
   };
 
@@ -136,38 +313,76 @@ export default function UploadSection({
         <div className="flex items-center gap-2">
           <button
             onClick={handleSeedDemo}
-            disabled={isLoading}
+            disabled={isLoading || isProcessing}
             className="btn-squish inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
             style={{
               backgroundColor: "var(--bg-surface)",
               borderColor: "var(--border-default)",
             }}
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]"></span>
-            Reload Sample 3D Scan
+            Load Sample 3D Scan
           </button>
         </div>
       </div>
 
-      {/* PERMANENT SPATIAL VIEWER: Always visible on initial load */}
+      {/* Progress & Next Step Guidance Prompt */}
+      {(isLoading || isProcessing) && (
+        <div className="p-4 rounded-xl border space-y-3" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-primary)]">
+                <span className="h-2 w-2 rounded-full bg-[var(--accent)] animate-pulse" />
+                <span>Processing 3D spatial reconstruction in background</span>
+                <span className="font-mono text-[11px] text-[var(--text-muted)]">
+                  ({progressStage || "processing"} · {progressPct}%)
+                </span>
+              </div>
+              <p className="text-[11px] text-[var(--text-muted)]">
+                While geometry and measurements are being extracted, you can proceed to upload your insurance policy document.
+              </p>
+            </div>
+
+            {onNavigateTab && (
+              <button
+                onClick={() => onNavigateTab("policy")}
+                className="btn-squish shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--border-default)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-all"
+              >
+                Proceed to Policy Documents →
+              </button>
+            )}
+          </div>
+
+          {/* Progress Bar */}
+          <div className="w-full bg-[var(--bg-card)] rounded-full h-1.5 overflow-hidden border" style={{ borderColor: "var(--border-subtle)" }}>
+            <div
+              className="h-full bg-[var(--accent)] transition-all duration-300"
+              style={{ width: `${Math.max(5, progressPct)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* SPATIAL VIEWER: Renders clean empty state when no scanData is active */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-mono uppercase tracking-wider text-[var(--accent)] font-semibold">
             Interactive Visual Output
           </span>
           <span className="text-[11px] font-mono text-[var(--text-muted)]">
-            Active Dataset: {scanData.tier}
+            {scanData ? `active dataset: ${isDemo ? "sample preview" : scanData.tier}` : "no active scan"}
           </span>
         </div>
 
         <SpatialViewer
           jobId={jobId}
-          areaM2={scanData.areaM2}
-          wallsCount={scanData.wallsCount}
-          errorEst={scanData.errorEst}
-          tier={scanData.tier}
-          plyUrl={scanData.plyUrl}
-          svgRaw={scanData.svgContent}
+          areaM2={scanData?.areaM2 || 0}
+          wallsCount={scanData?.wallsCount || 0}
+          errorEst={scanData?.errorEst || "±2.5 cm"}
+          tier={scanData?.tier || "no active scan"}
+          plyUrl={scanData?.plyUrl}
+          svgRaw={scanData?.svgContent}
+          hasData={scanData !== null}
+          isDemo={isDemo}
         />
       </div>
 
@@ -175,7 +390,7 @@ export default function UploadSection({
       <div className="space-y-4 pt-4 border-t" style={{ borderColor: "var(--border-subtle)" }}>
         <div className="flex items-center justify-between">
           <span className="font-serif text-lg font-semibold text-[var(--text-primary)]">
-            Upload New Property Footage
+            Upload Property Footage
           </span>
           {/* Media Type Selector */}
           <div className="flex items-center gap-1.5 p-1 rounded-lg border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
@@ -219,14 +434,8 @@ export default function UploadSection({
           <input
             type="file"
             id="mediaUploadInput"
-            multiple={activeMediaTab === "photos"}
-            accept={
-              activeMediaTab === "photos"
-                ? "image/jpeg,image/png,image/heic"
-                : activeMediaTab === "video"
-                ? "video/mp4,video/quicktime"
-                : ".usdz,.ply,.json"
-            }
+            multiple
+            accept=".jpg,.jpeg,.png,.heic,.webp,.mp4,.mov,.avi,.mkv,.usdz,.ply,.json"
             className="hidden"
             onChange={(e) => handleFiles(e.target.files)}
           />
@@ -254,11 +463,7 @@ export default function UploadSection({
               </label>
             </p>
             <p className="text-[11px] text-[var(--text-muted)]">
-              {activeMediaTab === "photos"
-                ? "Supports overlapping JPEG/PNG photos"
-                : activeMediaTab === "video"
-                ? "Continuous walk-around video (MP4/MOV)"
-                : "Apple RoomPlan export, USDZ archive, or PLY point cloud"}
+              Supports photos (JPG/PNG/HEIC), continuous walkthrough video (MP4/MOV), and LiDAR (USDZ/PLY/JSON) simultaneously.
             </p>
           </div>
 
