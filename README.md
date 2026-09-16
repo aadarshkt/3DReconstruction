@@ -63,6 +63,42 @@ Once started:
 
 ---
 
+## 🛠️ Local Development & PostgreSQL Setup (Homebrew)
+
+If running the backend locally outside of Docker on macOS:
+
+### 1. Start PostgreSQL via Homebrew
+```bash
+brew services start postgresql@16
+```
+
+### 2. Create Database & User (One-Time Setup)
+Create the `floorplan` user and database with credentials matching `backend/app/config.py`:
+```bash
+# 1. Create superuser/role
+createuser -s floorplan
+
+# 2. Set password to floorplan_secret
+psql -d postgres -c "ALTER USER floorplan WITH PASSWORD 'floorplan_secret';"
+
+# 3. Create database
+createdb -U floorplan floorplan
+```
+
+### 3. Run FastAPI Backend Locally
+```bash
+cd backend
+PYTHONPATH=. ../.venv/bin/uvicorn app.main:app --reload --port 8000
+```
+
+> **Tip (Zero-dependency SQLite fallback)**: To run without a local PostgreSQL instance or Docker for rapid frontend/agent testing, set:
+> ```bash
+> echo "DATABASE_URL=sqlite+aiosqlite:///data/floorplan.db" >> backend/.env
+> ```
+
+---
+
+
 ## 🐳 Pods & Quick Reference
 
 The backend is split into four Docker Compose services ("pods"):
@@ -224,7 +260,14 @@ When a test script finishes successfully, open `web_dashboard/index.html` in you
 | `/jobs/{id}/ws` | WS | Real-time progress stream |
 | `/jobs/{id}/results` | GET | Structured result JSON |
 | `/jobs/{id}/files/{name}` | GET | Download DXF/SVG/PLY/CSV |
+| `/api/v1/claims` | POST | Create insurance claim (optionally linked to 3D job) |
+| `/api/v1/claims/{id}` | GET | Fetch claim status, policy analysis, and cost estimate |
+| `/api/v1/claims/{id}/policy/upload` | POST | Upload and index policy PDF with ChromaDB RAG |
+| `/api/v1/claims/{id}/policy/analyze` | POST | Legal policy coverage determination |
+| `/api/v1/claims/{id}/estimate` | POST | Generate itemized repair cost estimate & net payout |
+| `/api/v1/claims/{id}/chat` | POST | Natural language claim & policy assistant (intent-routed) |
 | `/health` | GET | Health check |
+
 
 ---
 
