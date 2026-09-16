@@ -85,11 +85,19 @@ psql -d postgres -c "ALTER USER floorplan WITH PASSWORD 'floorplan_secret';"
 createdb -U floorplan floorplan
 ```
 
-### 3. Run FastAPI Backend Locally
+### 3. Run FastAPI Backend (Uvicorn)
+
+**From the project root directory:**
+```bash
+PYTHONPATH=backend ./.venv/bin/uvicorn app.main:app --app-dir backend --reload --port 8000
+```
+
+**Or from inside the `backend/` directory:**
 ```bash
 cd backend
 PYTHONPATH=. ../.venv/bin/uvicorn app.main:app --reload --port 8000
 ```
+
 
 > **Tip (Zero-dependency SQLite fallback)**: To run without a local PostgreSQL instance or Docker for rapid frontend/agent testing, set:
 > ```bash
