@@ -57,7 +57,7 @@ export default function ProfilePage() {
 
             <Link
               href="/portal"
-              className="btn-squish inline-flex items-center justify-center rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all"
+              className="btn-squish w-full sm:w-auto inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-all text-center"
               style={{
                 backgroundColor: "var(--accent)",
               }}
@@ -163,7 +163,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Claims History Table */}
+          {/* Claims History Section */}
           <div
             className="rounded-2xl border overflow-hidden"
             style={{
@@ -171,7 +171,7 @@ export default function ProfilePage() {
               borderColor: "var(--border-default)",
             }}
           >
-            <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border-subtle)" }}>
+            <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border-subtle)" }}>
               <span className="font-serif text-base font-semibold text-[var(--text-primary)]">
                 Recent Claims & Spatial Surveys
               </span>
@@ -180,7 +180,27 @@ export default function ProfilePage() {
               </span>
             </div>
 
-            <div className="overflow-x-auto">
+            {/* Mobile Claims Cards (< md) */}
+            <div className="md:hidden divide-y" style={{ borderColor: "var(--border-subtle)" }}>
+              {claimsHistory.map((clm) => (
+                <div key={clm.id} className="p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs font-semibold text-[var(--accent)]">{clm.id}</span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                      {clm.status}
+                    </span>
+                  </div>
+                  <div className="text-xs font-medium text-[var(--text-primary)]">{clm.cause}</div>
+                  <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)] font-mono pt-1">
+                    <span>{clm.date} · {clm.scanArea}</span>
+                    <span className="font-semibold text-[var(--text-primary)] text-xs">{clm.netPayout}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Claims Table (md and above) */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr

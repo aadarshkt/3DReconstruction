@@ -124,15 +124,15 @@ export default function ChatAssistantSection({ claimId }: ChatAssistantSectionPr
 
   return (
     <div
-      className="rounded-2xl border flex flex-col h-[600px] overflow-hidden"
+      className="rounded-2xl border flex flex-col h-[500px] sm:h-[600px] max-h-[75vh] overflow-hidden"
       style={{
         backgroundColor: "var(--bg-card)",
         borderColor: "var(--border-default)",
       }}
     >
       {/* Header */}
-      <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border-subtle)" }}>
-        <div className="flex items-center gap-3">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border-subtle)" }}>
+        <div className="flex items-center gap-2.5 sm:gap-3">
           <div
             className="flex h-8 w-8 items-center justify-center rounded-lg border font-serif text-xs font-semibold"
             style={{
@@ -144,23 +144,23 @@ export default function ChatAssistantSection({ claimId }: ChatAssistantSectionPr
             AI
           </div>
           <div>
-            <div className="font-serif text-sm font-semibold text-[var(--text-primary)]">
+            <div className="font-serif text-xs sm:text-sm font-semibold text-[var(--text-primary)]">
               Claim & Policy Intelligence Assistant
             </div>
-            <div className="text-[10px] font-mono text-[var(--text-muted)]">
-              Multi-Intent RAG · 3D Spatial Geometry · Deterministic Cost Engine
+            <div className="text-[9px] sm:text-[10px] font-mono text-[var(--text-muted)] truncate max-w-[200px] sm:max-w-none">
+              Multi-Intent RAG · 3D Spatial Geometry · Cost Engine
             </div>
           </div>
         </div>
 
-        <span className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+        <span className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-emerald-600 dark:text-emerald-400 font-medium shrink-0">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
           Ready
         </span>
       </div>
 
       {/* Messages Stream */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 space-y-3 sm:space-y-4">
         {messages.map((msg) => {
           const isUser = msg.sender === "user";
           return (
@@ -169,7 +169,7 @@ export default function ChatAssistantSection({ claimId }: ChatAssistantSectionPr
               className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
             >
               <div
-                className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-xs leading-relaxed ${
+                className={`max-w-[90%] sm:max-w-[75%] rounded-2xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs leading-relaxed ${
                   isUser
                     ? "bg-[var(--accent)] text-white shadow-sm"
                     : "border text-[var(--text-primary)]"
@@ -205,7 +205,7 @@ export default function ChatAssistantSection({ claimId }: ChatAssistantSectionPr
       </div>
 
       {/* Suggested Prompt Chips */}
-      <div className="px-6 py-2.5 border-t flex items-center gap-2 overflow-x-auto no-scrollbar" style={{ borderColor: "var(--border-subtle)", backgroundColor: "var(--bg-surface)" }}>
+      <div className="px-3.5 sm:px-6 py-2 sm:py-2.5 border-t flex items-center gap-2 overflow-x-auto no-scrollbar" style={{ borderColor: "var(--border-subtle)", backgroundColor: "var(--bg-surface)" }}>
         <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] shrink-0">
           Suggested:
         </span>
@@ -213,7 +213,7 @@ export default function ChatAssistantSection({ claimId }: ChatAssistantSectionPr
           <button
             key={idx}
             onClick={() => handleSend(p.query)}
-            className="btn-squish shrink-0 rounded-full border px-3 py-1 text-[11px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-colors"
+            className="btn-squish shrink-0 rounded-full border px-2.5 sm:px-3 py-1 text-[10px] sm:text-[11px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-colors whitespace-nowrap"
             style={{
               backgroundColor: "var(--bg-card)",
               borderColor: "var(--border-default)",
@@ -225,7 +225,7 @@ export default function ChatAssistantSection({ claimId }: ChatAssistantSectionPr
       </div>
 
       {/* Input Bar */}
-      <div className="p-4 border-t" style={{ borderColor: "var(--border-subtle)" }}>
+      <div className="p-3 sm:p-4 border-t" style={{ borderColor: "var(--border-subtle)" }}>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -237,8 +237,8 @@ export default function ChatAssistantSection({ claimId }: ChatAssistantSectionPr
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask anything about policy coverage, deductible, repair costs, or 3D scan dimensions..."
-            className="flex-1 rounded-xl border px-4 py-2.5 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+            placeholder="Ask anything about policy coverage, repair costs, or 3D scan..."
+            className="flex-1 rounded-xl border px-3 sm:px-4 py-2.5 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
             style={{
               backgroundColor: "var(--bg-surface)",
               borderColor: "var(--border-default)",
@@ -247,7 +247,7 @@ export default function ChatAssistantSection({ claimId }: ChatAssistantSectionPr
           <button
             type="submit"
             disabled={!input.trim()}
-            className="btn-squish rounded-xl px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-all disabled:opacity-40"
+            className="btn-squish rounded-xl px-4 sm:px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-all disabled:opacity-40 shrink-0"
             style={{
               backgroundColor: "var(--accent)",
             }}

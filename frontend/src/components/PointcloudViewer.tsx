@@ -170,12 +170,15 @@ export default function PointcloudViewer({ plyUrl, hasScan }: PointcloudViewerPr
   }, [plyUrl, hasScan]);
 
   return (
-    <div className="relative w-full h-[380px] sm:h-[440px] rounded-xl overflow-hidden border border-[var(--border-subtle)] bg-[#181716]">
-      <div ref={mountRef} className="w-full h-full" />
-      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[11px] text-[#A6A097] bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10">
-        <span>Click & drag to rotate · Scroll to zoom · Right-click to pan</span>
+    <div className="relative w-full h-[320px] sm:h-[440px] rounded-xl overflow-hidden border border-[var(--border-subtle)] bg-[#181716]">
+      <div ref={mountRef} className="w-full h-full touch-pan-y" />
+      <div className="absolute bottom-2 sm:bottom-3 left-2 sm:left-3 right-2 sm:right-3 flex flex-col xs:flex-row sm:flex-row items-start xs:items-center sm:items-center justify-between gap-1 text-[10px] sm:text-[11px] text-[#A6A097] bg-black/70 backdrop-blur-md px-2.5 sm:px-3 py-1.5 rounded-lg border border-white/10">
+        <span>
+          <span className="hidden sm:inline">Click & drag to rotate · Scroll to zoom · Right-click to pan</span>
+          <span className="sm:hidden">Drag to rotate · Pinch to zoom</span>
+        </span>
         <span className="font-mono text-[#D97757]">
-          {hasScan || plyUrl ? "Interactive 3D Dense Cloud" : "Scene Ready · No Scan Loaded"}
+          {hasScan || plyUrl ? "Interactive 3D Dense Cloud" : "Scene Ready"}
         </span>
       </div>
     </div>

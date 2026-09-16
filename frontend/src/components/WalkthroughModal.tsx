@@ -110,7 +110,7 @@ export default function WalkthroughModal({
 
       {/* Modal Card */}
       <div
-        className="relative z-10 w-full max-w-lg rounded-2xl border p-6 sm:p-8 shadow-2xl transition-all"
+        className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border p-5 sm:p-8 shadow-2xl transition-all"
         style={{
           backgroundColor: "var(--bg-card)",
           borderColor: "var(--border-default)",
@@ -118,7 +118,7 @@ export default function WalkthroughModal({
         }}
       >
         {/* Step Indicator & Close */}
-        <div className="flex items-center justify-between border-b pb-4" style={{ borderColor: "var(--border-subtle)" }}>
+        <div className="flex items-center justify-between border-b pb-3.5 sm:pb-4" style={{ borderColor: "var(--border-subtle)" }}>
           <div className="flex items-center gap-2">
             <span
               className="px-2 py-0.5 text-[11px] font-mono font-medium uppercase tracking-wider rounded"
@@ -132,15 +132,15 @@ export default function WalkthroughModal({
           </div>
           <button
             onClick={onClose}
-            className="text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+            className="text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1"
           >
             Skip Walkthrough
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="mt-6 space-y-4">
-          <h3 className="font-serif text-2xl font-medium tracking-tight text-[var(--text-primary)]">
+        <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
+          <h3 className="font-serif text-xl sm:text-2xl font-medium tracking-tight text-[var(--text-primary)]">
             {step.title}
           </h3>
           <p className="text-sm leading-relaxed text-[var(--text-secondary)]">

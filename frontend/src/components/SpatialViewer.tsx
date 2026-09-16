@@ -52,13 +52,13 @@ export default function SpatialViewer({
     >
       {/* Top Bar with Tabs and Meta */}
       <div
-        className="px-5 py-3.5 border-b flex flex-wrap items-center justify-between gap-3"
+        className="px-3 sm:px-5 py-3 border-b flex flex-wrap items-center justify-between gap-2.5 sm:gap-3"
         style={{ borderColor: "var(--border-subtle)", backgroundColor: "var(--bg-surface)" }}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
           <button
             onClick={() => setActiveTab("floorplan")}
-            className={`btn-squish px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+            className={`btn-squish flex-1 sm:flex-initial px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all text-center ${
               activeTab === "floorplan"
                 ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm border"
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -67,11 +67,12 @@ export default function SpatialViewer({
               borderColor: activeTab === "floorplan" ? "var(--border-default)" : "transparent",
             }}
           >
-            2D Dimensioned Floor Plan
+            <span className="hidden xs:inline sm:inline">2D Dimensioned Floor Plan</span>
+            <span className="xs:hidden sm:hidden">2D Floor Plan</span>
           </button>
           <button
             onClick={() => setActiveTab("pointcloud")}
-            className={`btn-squish px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+            className={`btn-squish flex-1 sm:flex-initial px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all text-center ${
               activeTab === "pointcloud"
                 ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm border"
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -80,39 +81,40 @@ export default function SpatialViewer({
               borderColor: activeTab === "pointcloud" ? "var(--border-default)" : "transparent",
             }}
           >
-            3D Point Cloud Model
+            <span className="hidden xs:inline sm:inline">3D Point Cloud Model</span>
+            <span className="xs:hidden sm:hidden">3D Point Cloud</span>
           </button>
         </div>
 
         {/* Status / format tags */}
-        <div className="flex items-center gap-2 text-[11px] font-mono">
+        <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-[11px] font-mono">
           {hasData && (
             <span
-              className="px-2 py-0.5 rounded border text-xs"
+              className="px-2 py-0.5 rounded border text-[10px] sm:text-xs"
               style={{
                 borderColor: isDemo ? "var(--border-default)" : "var(--accent-subtle)",
                 color: isDemo ? "var(--text-muted)" : "var(--accent)",
                 backgroundColor: "var(--bg-surface)",
               }}
             >
-              {isDemo ? "sample preview" : "live reconstruction"}
+              {isDemo ? "sample preview" : "live scan"}
             </span>
           )}
-          <span className="hidden sm:inline text-[var(--text-muted)]">Reconstruction:</span>
-          <span className="px-2 py-0.5 rounded border text-[var(--accent)] font-semibold" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-subtle)" }}>
+          <span className="hidden md:inline text-[var(--text-muted)]">Reconstruction:</span>
+          <span className="px-1.5 sm:px-2 py-0.5 rounded border text-[var(--accent)] font-semibold" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-subtle)" }}>
             SVG
           </span>
-          <span className="px-2 py-0.5 rounded border text-[var(--accent)] font-semibold" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-subtle)" }}>
-            PLY 3D
+          <span className="px-1.5 sm:px-2 py-0.5 rounded border text-[var(--accent)] font-semibold" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-subtle)" }}>
+            PLY
           </span>
-          <span className="px-2 py-0.5 rounded border text-[var(--accent)] font-semibold" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-subtle)" }}>
+          <span className="px-1.5 sm:px-2 py-0.5 rounded border text-[var(--accent)] font-semibold" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-subtle)" }}>
             DXF
           </span>
         </div>
       </div>
 
       {/* Main Canvas Area */}
-      <div className="px-5">
+      <div className="px-3 sm:px-5">
         {!hasData ? (
           activeTab === "floorplan" ? (
             <div className="relative w-full h-[380px] sm:h-[440px] rounded-xl border flex flex-col items-center justify-center p-6 text-center bg-[#181716] border-[var(--border-subtle)]">
@@ -232,31 +234,31 @@ export default function SpatialViewer({
       </div>
 
       {/* Metric Summaries Strip */}
-      <div className="px-5 pb-5 pt-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3 rounded-xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
+      <div className="px-3 sm:px-5 pb-4 sm:pb-5 pt-1 grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="p-2.5 sm:p-3 rounded-xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
           <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)]">Floor Area</div>
-          <div className="text-sm font-semibold text-[var(--text-primary)] mt-0.5 font-serif">
+          <div className="text-xs sm:text-sm font-semibold text-[var(--text-primary)] mt-0.5 font-serif truncate">
             {hasData ? `${areaM2} m² (${(areaM2 * 10.764).toFixed(1)} sq ft)` : "--"}
           </div>
         </div>
 
-        <div className="p-3 rounded-xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
+        <div className="p-2.5 sm:p-3 rounded-xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
           <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)]">Wall Segments</div>
-          <div className="text-sm font-semibold text-[var(--text-primary)] mt-0.5 font-serif">
+          <div className="text-xs sm:text-sm font-semibold text-[var(--text-primary)] mt-0.5 font-serif truncate">
             {hasData ? `${wallsCount} Verified Segments` : "--"}
           </div>
         </div>
 
-        <div className="p-3 rounded-xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
+        <div className="p-2.5 sm:p-3 rounded-xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
           <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)]">Dimensional Error</div>
-          <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5 font-serif">
+          <div className="text-xs sm:text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5 font-serif truncate">
             {hasData ? errorEst : "--"}
           </div>
         </div>
 
-        <div className="p-3 rounded-xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
+        <div className="p-2.5 sm:p-3 rounded-xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
           <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)]">Source</div>
-          <div className="text-sm font-semibold text-[var(--text-primary)] mt-0.5 truncate font-serif">
+          <div className="text-xs sm:text-sm font-semibold text-[var(--text-primary)] mt-0.5 truncate font-serif">
             {hasData ? (isDemo ? "sample (roomplan)" : tier) : "no active scan"}
           </div>
         </div>

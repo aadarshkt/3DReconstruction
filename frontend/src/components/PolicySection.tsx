@@ -175,7 +175,7 @@ export default function PolicySection({
         <button
           onClick={handleLoadSamplePolicy}
           disabled={isLoading}
-          className="btn-squish inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
+          className="btn-squish w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
           style={{
             backgroundColor: "var(--bg-card)",
             borderColor: "var(--border-default)",
@@ -186,7 +186,7 @@ export default function PolicySection({
       </div>
 
       {/* Loss & Claim Parameters */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <div>
           <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
             Cause of Loss
@@ -227,7 +227,7 @@ export default function PolicySection({
 
       {/* PDF Upload Dropzone */}
       <div
-        className="relative flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-dashed transition-all"
+        className="relative flex flex-col items-center justify-center p-6 sm:p-8 rounded-2xl border-2 border-dashed transition-all"
         style={{
           borderColor: policyUploaded ? "var(--accent)" : "var(--border-default)",
           backgroundColor: policyUploaded ? "var(--bg-surface)" : "var(--bg-card)",
@@ -243,7 +243,7 @@ export default function PolicySection({
 
         <div className="flex flex-col items-center text-center space-y-2">
           <div
-            className="flex h-12 w-12 items-center justify-center rounded-xl border text-sm font-serif font-semibold"
+            className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl border text-sm font-serif font-semibold"
             style={{
               borderColor: "var(--border-default)",
               backgroundColor: "var(--bg-surface)",
@@ -253,24 +253,24 @@ export default function PolicySection({
             PDF
           </div>
 
-          <p className="text-sm font-medium text-[var(--text-primary)]">
+          <p className="text-xs sm:text-sm font-medium text-[var(--text-primary)]">
             {policyUploaded ? (
               <span className="font-semibold text-[var(--accent)]">
                 Policy Document Uploaded & Indexed
               </span>
             ) : (
               <>
-                Drop policy PDF here, or{" "}
                 <label
                   htmlFor="policyPdfInput"
                   className="cursor-pointer font-semibold text-[var(--accent)] underline underline-offset-2 hover:opacity-80"
                 >
-                  select document
+                  Tap to upload policy PDF
                 </label>
+                <span className="hidden sm:inline"> or drop file here</span>
               </>
             )}
           </p>
-          <p className="text-xs text-[var(--text-muted)]">
+          <p className="text-[11px] text-[var(--text-muted)] max-w-sm sm:max-w-none">
             Standard ISO HO-3, HO-5, commercial property forms, or endorsement schedules
           </p>
         </div>
@@ -279,7 +279,7 @@ export default function PolicySection({
       {/* Analysis Output */}
       {analysis && (
         <div
-          className="rounded-2xl border p-6 space-y-5"
+          className="rounded-2xl border p-4 sm:p-6 space-y-4 sm:space-y-5"
           style={{
             backgroundColor: "var(--bg-card)",
             borderColor: "var(--border-default)",

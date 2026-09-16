@@ -24,7 +24,7 @@ export default function LandingPage() {
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="relative px-4 sm:px-6 lg:px-8 pt-16 pb-20 sm:pt-24 sm:pb-28 overflow-hidden">
+        <section className="relative px-4 sm:px-6 lg:px-8 pt-10 pb-14 sm:pt-20 sm:pb-24 overflow-hidden">
           {/* Subtle background gradient and dot grid */}
           <div
             className="absolute inset-0 -z-10 opacity-30 pointer-events-none"
@@ -35,7 +35,7 @@ export default function LandingPage() {
             }}
           />
 
-          <div className="mx-auto max-w-4xl text-center space-y-8">
+          <div className="mx-auto max-w-4xl text-center space-y-6 sm:space-y-8">
             {/* Top Pill Badge */}
             <div className="inline-flex items-center gap-2 rounded-full border px-3.5 py-1 text-xs font-mono font-medium text-[var(--text-secondary)] shadow-sm"
               style={{
@@ -48,20 +48,20 @@ export default function LandingPage() {
             </div>
 
             {/* Main Headline */}
-            <h1 className="font-serif text-4xl sm:text-6xl lg:text-7xl font-medium tracking-tight text-[var(--text-primary)] leading-[1.08]">
+            <h1 className="font-serif text-3xl sm:text-5xl lg:text-7xl font-medium tracking-tight text-[var(--text-primary)] leading-[1.12] sm:leading-[1.08]">
               From Smartphone Capture to Accurate Floor Plans & Instant Estimates.
             </h1>
 
             {/* Subheading */}
-            <p className="mx-auto max-w-2xl text-base sm:text-lg text-[var(--text-secondary)] leading-relaxed font-sans">
+            <p className="mx-auto max-w-2xl text-sm sm:text-lg text-[var(--text-secondary)] leading-relaxed font-sans px-2">
               Transform room photos, walkthrough video, or iPhone LiDAR exports into certified 2D architectural drawings, verify insurance coverage clauses, and calculate repair payouts without waiting weeks for an adjuster.
             </p>
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2 w-full max-w-md mx-auto sm:max-w-none">
               <Link
                 href="/portal"
-                className="btn-squish w-full sm:w-auto inline-flex items-center justify-center rounded-xl px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition-all"
+                className="btn-squish w-full sm:w-auto inline-flex items-center justify-center rounded-xl px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition-all text-center"
                 style={{
                   backgroundColor: "var(--accent)",
                 }}
@@ -71,7 +71,7 @@ export default function LandingPage() {
 
               <button
                 onClick={() => setIsTourOpen(true)}
-                className="btn-squish w-full sm:w-auto inline-flex items-center justify-center rounded-xl border px-6 py-3.5 text-sm font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
+                className="btn-squish w-full sm:w-auto inline-flex items-center justify-center rounded-xl border px-6 py-3.5 text-sm font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all text-center"
                 style={{
                   backgroundColor: "var(--bg-card)",
                   borderColor: "var(--border-default)",
@@ -82,22 +82,22 @@ export default function LandingPage() {
             </div>
 
             {/* Trust / Metric Strip */}
-            <div className="pt-8 border-t max-w-3xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-6 text-center" style={{ borderColor: "var(--border-subtle)" }}>
-              <div>
-                <div className="font-serif text-2xl font-semibold text-[var(--text-primary)]">±2.5 cm</div>
-                <div className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider font-mono mt-0.5">LiDAR Precision</div>
+            <div className="pt-6 sm:pt-8 border-t max-w-3xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 text-center" style={{ borderColor: "var(--border-subtle)" }}>
+              <div className="p-2">
+                <div className="font-serif text-xl sm:text-2xl font-semibold text-[var(--text-primary)]">±2.5 cm</div>
+                <div className="text-[10px] sm:text-[11px] text-[var(--text-muted)] uppercase tracking-wider font-mono mt-0.5">LiDAR Precision</div>
               </div>
-              <div>
-                <div className="font-serif text-2xl font-semibold text-[var(--text-primary)]">100%</div>
-                <div className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider font-mono mt-0.5">ISO HO-3 Compatible</div>
+              <div className="p-2">
+                <div className="font-serif text-xl sm:text-2xl font-semibold text-[var(--text-primary)]">100%</div>
+                <div className="text-[10px] sm:text-[11px] text-[var(--text-muted)] uppercase tracking-wider font-mono mt-0.5">ISO HO-3 Compatible</div>
               </div>
-              <div>
-                <div className="font-serif text-2xl font-semibold text-[var(--text-primary)]">&lt; 3 Min</div>
-                <div className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider font-mono mt-0.5">Estimate Generation</div>
+              <div className="p-2">
+                <div className="font-serif text-xl sm:text-2xl font-semibold text-[var(--text-primary)]">&lt; 3 Min</div>
+                <div className="text-[10px] sm:text-[11px] text-[var(--text-muted)] uppercase tracking-wider font-mono mt-0.5">Estimate Generation</div>
               </div>
-              <div>
-                <div className="font-serif text-2xl font-semibold text-[var(--text-primary)]">24 / 7</div>
-                <div className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider font-mono mt-0.5">Claim Intelligence</div>
+              <div className="p-2">
+                <div className="font-serif text-xl sm:text-2xl font-semibold text-[var(--text-primary)]">24 / 7</div>
+                <div className="text-[10px] sm:text-[11px] text-[var(--text-muted)] uppercase tracking-wider font-mono mt-0.5">Claim Intelligence</div>
               </div>
             </div>
           </div>

@@ -88,12 +88,12 @@ export default function UserPortalPage() {
         }}
       />
 
-      <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-6xl space-y-8">
+      <main className="flex-1 py-6 sm:py-8 px-3 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl space-y-6 sm:space-y-8">
           {/* Welcome Header */}
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b pb-6" style={{ borderColor: "var(--border-subtle)" }}>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b pb-5 sm:pb-6" style={{ borderColor: "var(--border-subtle)" }}>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[11px] font-mono uppercase tracking-widest text-[var(--accent)] font-semibold">
                   User Workspace
                 </span>
@@ -119,7 +119,7 @@ export default function UserPortalPage() {
                 )}
               </div>
 
-              <h1 className="font-serif text-3xl sm:text-4xl font-medium tracking-tight text-[var(--text-primary)]">
+              <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-medium tracking-tight text-[var(--text-primary)] leading-tight">
                 Claim & Reconstruction Overview
               </h1>
               <p className="text-xs text-[var(--text-secondary)]">
@@ -127,12 +127,12 @@ export default function UserPortalPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col xs:flex-row sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
               {!isDemoMode && !jobId && (
                 <button
                   onClick={handleLoadSample}
                   disabled={isLoading}
-                  className="btn-squish inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
+                  className="btn-squish flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
                   style={{
                     backgroundColor: "var(--bg-surface)",
                     borderColor: "var(--border-default)",
@@ -144,36 +144,36 @@ export default function UserPortalPage() {
 
               <button
                 onClick={() => setIsTourOpen(true)}
-                className="btn-squish inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
+                className="btn-squish flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-lg border px-3.5 py-2 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
                 style={{
                   backgroundColor: "var(--bg-card)",
                   borderColor: "var(--border-default)",
                 }}
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
-                Second-Person Walkthrough
+                <span className="sm:inline">Guided Walkthrough</span>
               </button>
             </div>
           </div>
 
-          {/* Workflow Tabs */}
+          {/* Responsive Workflow Tabs */}
           <div
-            className="flex items-center gap-2 p-1.5 rounded-xl border overflow-x-auto no-scrollbar"
+            className="flex items-center gap-1.5 sm:gap-2 p-1 sm:p-1.5 rounded-xl border overflow-x-auto no-scrollbar"
             style={{
               backgroundColor: "var(--bg-surface)",
               borderColor: "var(--border-subtle)",
             }}
           >
             {[
-              { key: "footage", label: "1. Property Footage (Images/Videos/LiDAR)" },
-              { key: "policy", label: "2. Insurance Policy Documents" },
-              { key: "costs", label: "3. Cost Calculation & Repair Schedule" },
-              { key: "assistant", label: "4. Claim Assistant & General QA" },
+              { key: "footage", label: "1. Property Footage (Images/Videos/LiDAR)", shortLabel: "1. Footage" },
+              { key: "policy", label: "2. Insurance Policy Documents", shortLabel: "2. Policy" },
+              { key: "costs", label: "3. Cost Calculation & Repair Schedule", shortLabel: "3. Costs" },
+              { key: "assistant", label: "4. Claim Assistant & General QA", shortLabel: "4. Assistant" },
             ].map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key as any)}
-                className={`btn-squish shrink-0 px-4 py-2 text-xs font-medium rounded-lg transition-all ${
+                className={`btn-squish shrink-0 px-2.5 sm:px-4 py-2 text-xs font-medium rounded-lg transition-all ${
                   activeTab === tab.key
                     ? "bg-[var(--bg-card)] text-[var(--text-primary)] font-semibold shadow-sm border"
                     : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -182,14 +182,15 @@ export default function UserPortalPage() {
                   borderColor: activeTab === tab.key ? "var(--border-default)" : "transparent",
                 }}
               >
-                {tab.label}
+                <span className="hidden md:inline">{tab.label}</span>
+                <span className="md:hidden">{tab.shortLabel}</span>
               </button>
             ))}
           </div>
 
           {/* Active Workspace View */}
           <div
-            className="rounded-2xl border p-6 sm:p-8 transition-all"
+            className="rounded-2xl border p-4 sm:p-6 lg:p-8 transition-all"
             style={{
               backgroundColor: "var(--bg-card)",
               borderColor: "var(--border-default)",

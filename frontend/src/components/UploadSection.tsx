@@ -298,11 +298,11 @@ export default function UploadSection({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Header & Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4" style={{ borderColor: "var(--border-subtle)" }}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b pb-4" style={{ borderColor: "var(--border-subtle)" }}>
         <div>
-          <h2 className="font-serif text-2xl font-medium tracking-tight text-[var(--text-primary)]">
+          <h2 className="font-serif text-xl sm:text-2xl font-medium tracking-tight text-[var(--text-primary)]">
             Property Footage & Spatial Reconstruction
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1">
@@ -310,11 +310,11 @@ export default function UploadSection({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={handleSeedDemo}
             disabled={isLoading || isProcessing}
-            className="btn-squish inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
+            className="btn-squish w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
             style={{
               backgroundColor: "var(--bg-surface)",
               borderColor: "var(--border-default)",
@@ -330,9 +330,9 @@ export default function UploadSection({
         <div className="p-4 rounded-xl border space-y-3" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="space-y-0.5">
-              <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-primary)]">
+              <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-primary)] flex-wrap">
                 <span className="h-2 w-2 rounded-full bg-[var(--accent)] animate-pulse" />
-                <span>Processing 3D spatial reconstruction in background</span>
+                <span>Processing 3D spatial reconstruction</span>
                 <span className="font-mono text-[11px] text-[var(--text-muted)]">
                   ({progressStage || "processing"} · {progressPct}%)
                 </span>
@@ -345,7 +345,7 @@ export default function UploadSection({
             {onNavigateTab && (
               <button
                 onClick={() => onNavigateTab("policy")}
-                className="btn-squish shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--border-default)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-all"
+                className="btn-squish w-full sm:w-auto shrink-0 px-3 py-2 text-xs font-medium rounded-lg border border-[var(--border-default)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-all text-center"
               >
                 Proceed to Policy Documents →
               </button>
@@ -364,21 +364,21 @@ export default function UploadSection({
 
       {/* Upload Dropzone Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <span className="font-serif text-lg font-semibold text-[var(--text-primary)]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <span className="font-serif text-base sm:text-lg font-semibold text-[var(--text-primary)]">
             Upload Property Footage
           </span>
           {/* Media Type Selector */}
-          <div className="flex items-center gap-1.5 p-1 rounded-lg border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
+          <div className="flex items-center gap-1 p-1 rounded-lg border overflow-x-auto" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
             {[
               { key: "photos", label: "Photos" },
-              { key: "video", label: "Video Walkthrough" },
-              { key: "lidar", label: "LiDAR Export" },
+              { key: "video", label: "Video" },
+              { key: "lidar", label: "LiDAR" },
             ].map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveMediaTab(tab.key as any)}
-                className={`btn-squish px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                className={`btn-squish flex-1 sm:flex-initial px-3 py-1.5 text-xs font-medium rounded-md transition-colors text-center ${
                   activeMediaTab === tab.key
                     ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm font-semibold"
                     : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -401,7 +401,7 @@ export default function UploadSection({
             setDragOver(false);
             handleFiles(e.dataTransfer.files);
           }}
-          className={`relative flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-dashed transition-all ${
+          className={`relative flex flex-col items-center justify-center p-6 sm:p-8 rounded-2xl border-2 border-dashed transition-all ${
             dragOver
               ? "border-[var(--accent)] bg-[var(--accent-subtle)]"
               : "border-[var(--border-default)] hover:border-[var(--border-strong)] bg-[var(--bg-card)]"
@@ -428,23 +428,22 @@ export default function UploadSection({
               {activeMediaTab === "photos" ? "JPG" : activeMediaTab === "video" ? "MP4" : "3D"}
             </div>
 
-            <p className="text-xs font-medium text-[var(--text-primary)]">
-              Drop your {activeMediaTab === "photos" ? "photos" : activeMediaTab === "video" ? "video file" : "LiDAR file"}{" "}
-              here, or{" "}
+            <p className="text-xs sm:text-sm font-medium text-[var(--text-primary)]">
               <label
                 htmlFor="mediaUploadInput"
                 className="cursor-pointer font-semibold text-[var(--accent)] underline underline-offset-2 hover:opacity-80"
               >
-                browse files
+                Tap to take photo / upload files
               </label>
+              <span className="hidden sm:inline"> or drop your {activeMediaTab === "photos" ? "photos" : activeMediaTab === "video" ? "video file" : "LiDAR file"} here</span>
             </p>
-            <p className="text-[11px] text-[var(--text-muted)]">
-              Supports photos (JPG/PNG/HEIC), continuous walkthrough video (MP4/MOV), and LiDAR (USDZ/PLY/JSON) simultaneously.
+            <p className="text-[11px] text-[var(--text-muted)] max-w-sm sm:max-w-none">
+              Supports photos (JPG/PNG/HEIC), continuous video (MP4/MOV), and LiDAR (USDZ/PLY/JSON).
             </p>
           </div>
 
           {statusMessage && (
-            <div className="mt-3 text-xs font-mono text-[var(--accent)]">
+            <div className="mt-3 text-xs font-mono text-[var(--accent)] text-center">
               {statusMessage}
             </div>
           )}
@@ -453,7 +452,7 @@ export default function UploadSection({
 
       {/* SPATIAL VIEWER: Renders clean empty state when no scanData is active */}
       <div className="space-y-2 pt-6 border-t" style={{ borderColor: "var(--border-subtle)" }}>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <span className="text-xs font-mono uppercase tracking-wider text-[var(--accent)] font-semibold">
             Interactive Visual Output
           </span>

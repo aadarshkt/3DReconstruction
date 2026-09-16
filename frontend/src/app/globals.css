@@ -116,3 +116,46 @@ select:disabled,
   cursor: not-allowed;
 }
 
+/* Mobile Touch & Scroll Optimizations */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 639px) {
+  /* Prevent iOS Safari auto-zoom when tapping text inputs */
+  input[type="text"],
+  input[type="email"],
+  input[type="number"],
+  input[type="search"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Hide scrollbar while keeping scroll functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Mobile drawer animation */
+@keyframes drawerSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-drawer-down {
+  animation: drawerSlideDown 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+

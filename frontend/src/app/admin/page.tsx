@@ -118,15 +118,15 @@ export default function AdminConsolePage() {
                   Admin Level
                 </span>
               </div>
-              <h1 className="font-serif text-3xl font-medium tracking-tight text-[var(--text-primary)] mt-1">
+              <h1 className="font-serif text-2xl sm:text-3xl font-medium tracking-tight text-[var(--text-primary)] mt-1">
                 System Diagnostics & Spatial Inspection
               </h1>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
               <Link
                 href="/portal"
-                className="btn-squish inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-all"
+                className="btn-squish w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-all text-center"
                 style={{ borderColor: "var(--border-default)" }}
               >
                 ← Return to User Portal
@@ -136,19 +136,19 @@ export default function AdminConsolePage() {
 
           {/* Config Bar */}
           <div
-            className="rounded-xl border p-4 flex flex-col sm:flex-row items-center justify-between gap-4"
+            className="rounded-xl border p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4"
             style={{
               backgroundColor: "var(--bg-card)",
               borderColor: "var(--border-default)",
             }}
           >
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <label className="text-xs font-mono text-[var(--text-muted)]">Backend URL:</label>
+            <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+              <label className="text-xs font-mono text-[var(--text-muted)] shrink-0">Backend URL:</label>
               <input
                 type="text"
                 value={serverUrl}
                 onChange={(e) => setServerUrl(e.target.value)}
-                className="flex-1 sm:w-64 rounded-md border px-2.5 py-1 text-xs font-mono text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                className="flex-1 sm:w-64 rounded-md border px-2.5 py-1.5 text-xs font-mono text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
                 style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}
               />
             </div>
@@ -157,7 +157,7 @@ export default function AdminConsolePage() {
               <button
                 onClick={handleRunClosedLoopTest}
                 disabled={isRunningTest}
-                className="btn-squish rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all disabled:opacity-50"
+                className="btn-squish w-full sm:w-auto rounded-lg px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-all disabled:opacity-50 text-center"
                 style={{ backgroundColor: "var(--accent)" }}
               >
                 {isRunningTest ? "Executing Test Sequence..." : "▶ Run Full Closed-Loop Test"}
@@ -166,7 +166,7 @@ export default function AdminConsolePage() {
           </div>
 
           {/* 5-Step Pipeline Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3">
             {[
               { num: "01", title: "3D Geometry", status: stepStatus.scan, desc: "COLMAP / LiDAR area extraction" },
               { num: "02", title: "Policy RAG", status: stepStatus.rag, desc: "ChromaDB vector ingestion" },
