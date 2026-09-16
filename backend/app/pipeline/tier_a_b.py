@@ -97,8 +97,29 @@ def _extract_frames(video_path: Path, output_dir: Path, fps: float = 3.0):
 
 
 # ── COLMAP pipeline ───────────────────────────────────────────────────────────
-def _is_cuda_available() -> bool:
+def _get_colmap_major_version() -> int:
     try:
+        res = subprocess.run([settings.COLMAP_BIN, "version"], capture_output=True, text=True)
+        out = (res.stdout or "") + (res.stderr or "")
+        import re
+        m = re.search(r"COLMAP\s+(\d+)\.", out)
+        if m:
+            return int(m.group(1))
+    except Exception:
+        pass
+    return 3
+
+
+def _is_cuda_available() -> bool:
+    import platform
+    if platform.system() == "Darwin":
+        # macOS lacks NVIDIA CUDA support; COLMAP runs in CPU mode
+        return False
+    try:
+        res = subprocess.run([settings.COLMAP_BIN, "version"], capture_output=True, text=True)
+        out = (res.stdout or "") + (res.stderr or "")
+        if "without GPU support" in out:
+            return False
         res = subprocess.run([settings.COLMAP_BIN, "patch_match_stereo", "--help"], capture_output=True, text=True)
         return res.returncode == 0
     except Exception:
@@ -222,17 +243,23 @@ def _run_manual_dense(workspace: Path, images_dir: Path, dense_dir: Path, progre
 
     has_cuda = _is_cuda_available()
 
+    colmap_v = _get_colmap_major_version()
+    feat_thread_flag = "--FeatureExtraction.num_threads" if colmap_v >= 4 else "--SiftExtraction.num_threads"
+    feat_gpu_flag = "--FeatureExtraction.use_gpu" if colmap_v >= 4 else "--SiftExtraction.use_gpu"
+    match_thread_flag = "--FeatureMatching.num_threads" if colmap_v >= 4 else "--SiftMatching.num_threads"
+    match_gpu_flag = "--FeatureMatching.use_gpu" if colmap_v >= 4 else "--SiftMatching.use_gpu"
+
     _run_cmd([settings.COLMAP_BIN, "feature_extractor",
               "--database_path", str(db_path),
               "--image_path", str(images_dir),
               "--ImageReader.single_camera", "1",
-              "--SiftExtraction.num_threads", str(settings.COLMAP_NUM_THREADS),
-              "--SiftExtraction.use_gpu", "1" if has_cuda else "0"], "feature_extractor")
+              feat_thread_flag, str(settings.COLMAP_NUM_THREADS),
+              feat_gpu_flag, "1" if has_cuda else "0"], "feature_extractor")
 
     _run_cmd([settings.COLMAP_BIN, "exhaustive_matcher",
               "--database_path", str(db_path),
-              "--SiftMatching.num_threads", str(settings.COLMAP_NUM_THREADS),
-              "--SiftMatching.use_gpu", "1" if has_cuda else "0"], "exhaustive_matcher")
+              match_thread_flag, str(settings.COLMAP_NUM_THREADS),
+              match_gpu_flag, "1" if has_cuda else "0"], "exhaustive_matcher")
 
     _run_cmd([settings.COLMAP_BIN, "mapper",
               "--database_path", str(db_path),

@@ -63,27 +63,37 @@ Once started:
 
 ---
 
-## 🛠️ Local Development & PostgreSQL Setup (Homebrew)
+## 🛠️ Local Development & Services Setup (Homebrew / macOS)
 
 If running the backend locally outside of Docker on macOS:
 
-### 1. Start PostgreSQL via Homebrew
+### 1. Start PostgreSQL & Redis via Homebrew
 ```bash
+# Start PostgreSQL (database for jobs and claims)
 brew services start postgresql@16
+
+# Start Redis (task queue broker and WebSocket progress pub/sub)
+brew services start redis
 ```
+*(Alternatively, run `redis-server` in a dedicated terminal).*
 
 ### 2. Create Database & User (One-Time Setup)
-Create the `floorplan` user and database with credentials matching `backend/app/config.py`:
+Create the `floorplan` user and database with credentials matching `backend/app/config.py` (or `backend/.env`):
 ```bash
 # 1. Create superuser/role
 createuser -s floorplan
 
-# 2. Set password to floorplan_secret
-psql -d postgres -c "ALTER USER floorplan WITH PASSWORD 'floorplan_secret';"
+# 2. Set password (default development password in backend/.env)
+psql -d postgres -c "ALTER USER floorplan WITH PASSWORD 'change_me_in_prod';"
 
 # 3. Create database
 createdb -U floorplan floorplan
 ```
+
+> **Note on Schema Updates**: If upgrading an existing local database after model changes, apply any missing columns:
+> ```bash
+> psql "postgresql://floorplan:change_me_in_prod@localhost:5432/floorplan" -c "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS is_demo BOOLEAN DEFAULT FALSE;"
+> ```
 
 ### 3. Run FastAPI Backend (Uvicorn)
 
@@ -98,6 +108,30 @@ cd backend
 PYTHONPATH=. ../.venv/bin/uvicorn app.main:app --reload --port 8000
 ```
 
+### 4. Install Photogrammetry Dependencies (COLMAP & FFmpeg)
+
+For **Tier A (Photos)** and **Tier B (Video)** Structure-from-Motion (SfM) reconstruction, the Celery worker calls `colmap` and `ffmpeg`:
+
+- **Option 1: Native macOS (Homebrew)**  
+  Install COLMAP and FFmpeg directly on your Mac:
+  ```bash
+  brew install colmap ffmpeg
+  ```
+  *(Restart your Celery worker after installation so `colmap` is available in your `PATH`).*
+
+- **Option 2: Docker Environment (Zero Manual C++ Setup)**  
+  If you prefer not installing heavy C++ photogrammetry libraries natively on macOS, run the services via Docker Compose where COLMAP, Open3D, and FFmpeg are pre-built:
+  ```bash
+  ./run.sh start -d
+  ```
+
+### 5. Run Celery Worker (Asynchronous Reconstruction Pipeline)
+To process 3D spatial reconstruction and pipeline jobs dispatched by the API (when running outside Docker):
+
+```bash
+cd backend
+PYTHONPATH=. ../.venv/bin/celery -A app.tasks.celery_tasks.celery_app worker -l info --concurrency=1
+```
 
 > **Tip (Zero-dependency SQLite fallback)**: To run without a local PostgreSQL instance or Docker for rapid frontend/agent testing, set:
 > ```bash
