@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.claim_chat import ClaimChatRouter
 from app.agents.cost_engine import CostEngine
 from app.agents.policy_rag import PolicyRAGEngine
 from app.config import get_claim_dir, settings
@@ -21,7 +22,13 @@ log = structlog.get_logger()
 router = APIRouter()
 
 rag_engine = PolicyRAGEngine()
-cost_engine = CostEngine()
+cost_engine = CostEngine(llm_client=rag_engine.llm_client)
+chat_router = ClaimChatRouter(
+    llm_client=rag_engine.llm_client,
+    rag_engine=rag_engine,
+    cost_engine=cost_engine,
+)
+
 
 
 # ── Pydantic Request / Response Schemas ─────────────────────────────────────────
@@ -344,4 +351,61 @@ async def estimate_claim_costs(
         claim.error_message = f"Cost estimation failed: {str(e)}"
         await db.commit()
         raise HTTPException(status_code=500, detail=f"Cost estimation failed: {str(e)}")
+
+
+class ClaimChatMessage(BaseModel):
+    message: str = Field(..., description="User message or question about the claim, policy, costs, or 3D scan")
+
+
+@router.post("/{claim_id}/chat")
+async def chat_with_claim_assistant(
+    claim_id: str,
+    payload: ClaimChatMessage,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Interactive conversational assistant for the insurance claim.
+    Routes queries intelligently between:
+    - Policy RAG (coverage terms, perils, exclusions, deductible)
+    - Cost Engine (repairs, pricing, line items, payout)
+    - 3D Geometry (exact room area, walls, dimensions from scan)
+    - General Guidance (claims process, adjuster advice)
+    """
+    claim = await db.get(Claim, claim_id)
+    if not claim:
+        raise HTTPException(status_code=404, detail=f"Claim {claim_id} not found")
+
+    reconstruction_metrics = None
+    if claim.job_id:
+        job = await db.get(Job, claim.job_id)
+        if job and job.result_payload:
+            reconstruction_metrics = {
+                "room_area_m2": job.room_area_m2,
+                "wall_count": job.wall_count,
+                "walls": job.result_payload.get("walls", []),
+                "damage_area_m2": job.result_payload.get("damage_area_m2"),
+            }
+
+    claim_data = {
+        "id": claim.id,
+        "status": claim.status.value,
+        "cause_of_loss": claim.cause_of_loss,
+        "damage_description": claim.damage_description,
+        "property_type": claim.property_type,
+        "has_policy_pdf": claim.has_policy_pdf,
+    }
+
+    try:
+        response = chat_router.handle_chat(
+            claim_id=claim_id,
+            message=payload.message,
+            claim_data=claim_data,
+            reconstruction_metrics=reconstruction_metrics,
+            cost_estimate=claim.cost_estimate,
+        )
+        return response
+    except Exception as e:
+        log.error("claim_chat_error", claim_id=claim_id, error=str(e))
+        raise HTTPException(status_code=500, detail=f"Chat processing failed: {str(e)}")
+
 

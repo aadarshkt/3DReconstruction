@@ -202,7 +202,183 @@ canvas { display: block; width: 100% !important; height: 100% !important; }
 /* ── Utilities ───────────────────────────────────────────────────────────────── */
 .hidden { display: none !important; }
 
+/* ── Form elements & Dropzone ────────────────────────────────────────────────── */
+.form-select {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); padding: 8px 12px;
+  font-size: 0.85rem; font-family: var(--font); cursor: pointer;
+}
+.form-select:focus { outline: none; border-color: var(--accent); }
+
+.dropzone {
+  border: 2px dashed var(--border); border-radius: 8px;
+  padding: 14px 10px; text-align: center; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; color: var(--text-dim); font-size: 0.8rem; background: var(--surface2);
+  transition: all .2s;
+}
+.dropzone:hover, .dropzone.dragover {
+  border-color: var(--accent); background: rgba(99,102,241,0.08); color: var(--text);
+}
+.dropzone.uploaded {
+  border-color: var(--green); background: rgba(34,197,94,0.08); color: #86efac;
+}
+
+.claim-actions-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;
+}
+.btn-secondary {
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+}
+.btn-secondary:hover { background: var(--surface); border-color: var(--text-dim); }
+.btn-accent {
+  background: linear-gradient(135deg, #0ea5e9, #6366f1); color: white;
+}
+.btn-accent:hover { filter: brightness(1.15); transform: translateY(-1px); }
+.btn:disabled {
+  opacity: 0.45; cursor: not-allowed; transform: none !important; filter: none !important;
+}
+
+/* ── Badges ──────────────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 99px; font-size: 0.72rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.badge-success { background: rgba(34,197,94,0.18); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+.badge-danger  { background: rgba(239,68,68,0.18); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+.badge-warning { background: rgba(245,158,11,0.18); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
+.badge-info    { background: rgba(14,165,233,0.18); color: #38bdf8; border: 1px solid rgba(14,165,233,0.3); }
+.badge-neutral { background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border); }
+
+/* ── Claim View Container ────────────────────────────────────────────────────── */
+.claim-view-container {
+  flex: 1; display: flex; flex-direction: column; gap: 16px;
+  padding: 18px; overflow-y: auto; background: var(--bg);
+}
+
+.claim-cards-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; min-height: 280px;
+}
+@media (max-width: 960px) {
+  .claim-cards-row { grid-template-columns: 1fr; }
+}
+
+.claim-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.25);
+}
+.claim-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+}
+.claim-card-header h3 { font-size: 0.92rem; font-weight: 600; }
+.claim-card-body {
+  padding: 16px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+}
+.empty-state-text { color: var(--text-dim); font-size: 0.85rem; line-height: 1.5; }
+
+/* ── Policy Analysis Display ─────────────────────────────────────────────────── */
+.analysis-meta-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;
+}
+.analysis-stat {
+  background: var(--surface2); padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.analysis-stat .stat-label { font-size: 0.7rem; color: var(--text-dim); }
+.analysis-stat .stat-val { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+
+.clause-item {
+  background: var(--surface2); border-left: 3px solid var(--accent);
+  padding: 8px 12px; border-radius: 0 8px 8px 0; margin-bottom: 8px; font-size: 0.82rem;
+}
+.clause-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.clause-section { color: #818cf8; font-weight: 600; font-size: 0.75rem; }
+.clause-page { color: var(--text-dim); font-size: 0.72rem; }
+.clause-quote { color: var(--text); font-style: italic; line-height: 1.4; }
+
+.duty-pill {
+  display: inline-block; background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.25);
+  border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; margin: 3px;
+}
+
+/* ── Itemized Cost Table ─────────────────────────────────────────────────────── */
+.cost-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.cost-table th {
+  text-align: left; color: var(--text-dim); font-weight: 500;
+  padding: 8px; border-bottom: 1px solid var(--border); font-size: 0.75rem;
+}
+.cost-table td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.cost-summary-box {
+  background: var(--surface2); border-radius: 8px; padding: 12px;
+  border: 1px solid var(--border); margin-top: 8px;
+}
+.cost-summary-row {
+  display: flex; justify-content: space-between; font-size: 0.82rem;
+  color: var(--text-dim); margin-bottom: 5px;
+}
+.payout-highlight {
+  display: flex; justify-content: space-between; align-items: center;
+  background: linear-gradient(135deg, rgba(34,197,94,0.12), rgba(16,185,129,0.08));
+  border: 1px solid rgba(34,197,94,0.35); border-radius: 8px;
+  padding: 10px 14px; margin-top: 8px;
+}
+.payout-label { font-size: 0.85rem; font-weight: 600; color: #86efac; }
+.payout-amount { font-size: 1.3rem; font-weight: 700; color: #4ade80; }
+
+/* ── Interactive Chat ────────────────────────────────────────────────────────── */
+.claim-chat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); display: flex; flex-direction: column;
+  height: 380px; flex-shrink: 0; box-shadow: 0 4px 18px rgba(0,0,0,0.25);
+}
+.chat-messages {
+  flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px;
+}
+.chat-msg { display: flex; gap: 10px; max-width: 85%; }
+.chat-msg.assistant { align-self: flex-start; }
+.chat-msg.user { align-self: flex-end; flex-direction: row-reverse; }
+.msg-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--surface2); display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; flex-shrink: 0; border: 1px solid var(--border);
+}
+.msg-bubble {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px 14px; font-size: 0.85rem; line-height: 1.45;
+}
+.chat-msg.user .msg-bubble {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white; border: none; border-bottom-right-radius: 2px;
+}
+.chat-msg.assistant .msg-bubble {
+  border-bottom-left-radius: 2px;
+}
+.msg-meta {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 0.72rem;
+}
+.source-chip {
+  background: rgba(99,102,241,0.15); color: #a5b4fc;
+  padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; display: inline-block; margin-top: 4px;
+}
+
+.chat-input-bar {
+  display: flex; gap: 8px; padding: 12px 16px;
+  border-top: 1px solid var(--border); background: var(--surface);
+}
+.chat-input-bar input {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); padding: 10px 14px;
+  font-size: 0.875rem; font-family: var(--font);
+}
+.chat-input-bar input:focus { outline: none; border-color: var(--accent); }
+.chat-input-bar button { padding: 10px 20px; flex-shrink: 0; width: auto; }
+
 /* ── Scrollbar ───────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+

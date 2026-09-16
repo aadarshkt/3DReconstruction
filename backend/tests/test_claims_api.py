@@ -168,3 +168,14 @@ def test_upload_policy_and_analyze(test_client, tmp_path):
         assert "gross_estimate_usd" in est_data["cost_estimate"]
         assert est_data["cost_estimate"]["deductible_usd"] == 1000.0
 
+        # 5. Conversational chat
+        chat_resp = client.post(
+            f"/api/v1/claims/{claim_id}/chat",
+            json={"message": "How much is my deductible and net payout?"},
+        )
+        assert chat_resp.status_code == 200, chat_resp.text
+        chat_data = chat_resp.json()
+        assert "reply" in chat_data
+        assert chat_data["intent"] == "COST"
+
+

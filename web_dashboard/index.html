@@ -85,6 +85,51 @@
         </thead>
         <tbody id="wallTableBody"></tbody>
       </table>
+    <!-- Insurance Claim Setup -->
+    <section class="card" id="claimSetupCard">
+      <h2 class="card-title">Insurance Claim</h2>
+      <div class="field">
+        <label for="claimIdInput">Claim ID</label>
+        <div style="display: flex; gap: 6px;">
+          <input id="claimIdInput" type="text" placeholder="Claim UUID or new…" />
+          <button id="newClaimBtn" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.75rem;" title="Start New Claim">New</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="causeOfLossSelect">Cause of Loss</label>
+        <select id="causeOfLossSelect" class="form-select">
+          <option value="water" selected>Water Damage / Burst Pipe</option>
+          <option value="fire">Fire & Smoke Damage</option>
+          <option value="wind">Wind / Storm Damage</option>
+          <option value="hail">Hail Damage</option>
+          <option value="flood">Flood (Surface Water)</option>
+          <option value="other">Other Property Damage</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="damageDescInput">Damage Description</label>
+        <textarea id="damageDescInput" rows="2" placeholder="e.g. Broken pipe in kitchen flooded living room wall and floor..."></textarea>
+      </div>
+
+      <!-- Policy PDF Upload Dropzone -->
+      <div class="field">
+        <label>Policy PDF (HO-3 / HO-5)</label>
+        <div id="policyDropzone" class="dropzone">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
+          </svg>
+          <span id="policyDropzoneText">Drop Policy PDF here</span>
+          <input type="file" id="policyFileInput" accept="application/pdf" class="hidden" />
+        </div>
+      </div>
+
+      <div class="claim-actions-grid">
+        <button id="analyzeCoverageBtn" class="btn btn-accent" disabled>⚡ Analyze Policy</button>
+        <button id="estimateCostsBtn" class="btn btn-primary">💰 Estimate Costs</button>
+      </div>
     </section>
   </aside>
 
@@ -95,6 +140,7 @@
     <div class="tab-bar">
       <button class="tab active" data-tab="floorplan">Floor Plan</button>
       <button class="tab" data-tab="pointcloud">3D Point Cloud</button>
+      <button class="tab" data-tab="claim">🛡️ Insurance Claim</button>
     </div>
 
     <!-- Floor plan viewer -->
@@ -122,7 +168,57 @@
       </div>
     </div>
 
+    <!-- Insurance Claim View -->
+    <div id="tabClaim" class="tab-content hidden">
+      <div class="claim-view-container">
+        <div class="claim-cards-row">
+          <!-- Policy Coverage Analysis Card -->
+          <div class="claim-card" id="policyAnalysisCard">
+            <div class="claim-card-header">
+              <h3>Policy Coverage Determination</h3>
+              <span id="coverageBadge" class="badge badge-neutral">No Analysis</span>
+            </div>
+            <div class="claim-card-body" id="policyAnalysisBody">
+              <p class="empty-state-text">Upload your policy PDF and click <strong>"Analyze Policy"</strong> to evaluate coverage clauses, deductibles, and exclusions.</p>
+            </div>
+          </div>
+
+          <!-- Cost Estimation Card -->
+          <div class="claim-card" id="costEstimateCard">
+            <div class="claim-card-header">
+              <h3>Itemized Cost Estimate</h3>
+              <span id="payoutBadge" class="badge badge-neutral">—</span>
+            </div>
+            <div class="claim-card-body" id="costEstimateBody">
+              <p class="empty-state-text">Click <strong>"Estimate Costs"</strong> to calculate line items from 3D scan dimensions and repair rate tables.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive Claim Assistant Chat -->
+        <div class="claim-chat-card">
+          <div class="claim-card-header">
+            <h3>💬 Claim & Policy Assistant</h3>
+            <span class="badge badge-info">RAG + Cost + 3D Geometry</span>
+          </div>
+          <div class="chat-messages" id="chatMessages">
+            <div class="chat-msg assistant">
+              <div class="msg-avatar">🤖</div>
+              <div class="msg-bubble">
+                <div class="msg-content">Hello! I'm your Insurance Claim Assistant. Ask me anything about your policy coverage, deductible, repair costs, or 3D scan dimensions.</div>
+              </div>
+            </div>
+          </div>
+          <div class="chat-input-bar">
+            <input type="text" id="chatInput" placeholder="e.g. Is water damage covered under my policy? Or how much will drywall repair cost?" />
+            <button id="sendChatBtn" class="btn btn-primary">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
+
 
 </main>
 

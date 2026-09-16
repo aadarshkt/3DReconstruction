@@ -353,3 +353,412 @@ function hideStatus() {
 function capitalize(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
+
+// ── Insurance Claim Module ───────────────────────────────────────────────────
+initClaimModule();
+
+function initClaimModule() {
+  const claimIdInput       = document.getElementById('claimIdInput');
+  const newClaimBtn        = document.getElementById('newClaimBtn');
+  const causeOfLossSelect  = document.getElementById('causeOfLossSelect');
+  const damageDescInput    = document.getElementById('damageDescInput');
+  const policyDropzone     = document.getElementById('policyDropzone');
+  const policyDropzoneText = document.getElementById('policyDropzoneText');
+  const policyFileInput    = document.getElementById('policyFileInput');
+  const analyzeCoverageBtn = document.getElementById('analyzeCoverageBtn');
+  const estimateCostsBtn   = document.getElementById('estimateCostsBtn');
+  const coverageBadge      = document.getElementById('coverageBadge');
+  const policyAnalysisBody = document.getElementById('policyAnalysisBody');
+  const payoutBadge        = document.getElementById('payoutBadge');
+  const costEstimateBody   = document.getElementById('costEstimateBody');
+  const chatMessages       = document.getElementById('chatMessages');
+  const chatInput          = document.getElementById('chatInput');
+  const sendChatBtn        = document.getElementById('sendChatBtn');
+
+  let currentClaimId = null;
+
+  function getBase() {
+    return serverInput.value.replace(/\/$/, '');
+  }
+
+  function switchToClaimTab() {
+    const claimTabBtn = document.querySelector('.tab[data-tab="claim"]');
+    if (claimTabBtn) claimTabBtn.click();
+  }
+
+  // Create or retrieve claim
+  async function ensureClaim() {
+    if (currentClaimId) return currentClaimId;
+
+    const base = getBase();
+    const jobId = jobIdInput.value.trim() || null;
+    const cause = causeOfLossSelect.value;
+    const desc = damageDescInput.value.trim() || 'Physical property damage walkthrough';
+
+    showStatus('Creating insurance claim…', true);
+    try {
+      const res = await fetch(`${base}/api/v1/claims`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          job_id: jobId,
+          cause_of_loss: cause,
+          damage_description: desc,
+          property_type: 'residential',
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const claim = await res.json();
+      currentClaimId = claim.id;
+      claimIdInput.value = claim.id;
+      showStatus('Claim created ✓', false);
+      setTimeout(hideStatus, 2000);
+      return currentClaimId;
+    } catch (e) {
+      showStatus(`Failed to create claim: ${e.message}`, false);
+      throw e;
+    }
+  }
+
+  newClaimBtn.addEventListener('click', async () => {
+    currentClaimId = null;
+    claimIdInput.value = '';
+    policyDropzone.classList.remove('uploaded');
+    policyDropzoneText.textContent = 'Drop Policy PDF here';
+    analyzeCoverageBtn.disabled = true;
+    estimateCostsBtn.disabled = false;
+    coverageBadge.className = 'badge badge-neutral';
+    coverageBadge.textContent = 'No Analysis';
+    policyAnalysisBody.innerHTML = '<p class="empty-state-text">Upload your policy PDF and click <strong>"Analyze Policy"</strong> to evaluate coverage clauses, deductibles, and exclusions.</p>';
+    payoutBadge.className = 'badge badge-neutral';
+    payoutBadge.textContent = '—';
+    costEstimateBody.innerHTML = '<p class="empty-state-text">Click <strong>"Estimate Costs"</strong> to calculate line items from 3D scan dimensions and repair rate tables.</p>';
+    await ensureClaim();
+  });
+
+  claimIdInput.addEventListener('change', async () => {
+    const id = claimIdInput.value.trim();
+    if (!id) return;
+    currentClaimId = id;
+    const base = getBase();
+    try {
+      const res = await fetch(`${base}/api/v1/claims/${id}`);
+      if (res.ok) {
+        const claim = await res.json();
+        causeOfLossSelect.value = claim.cause_of_loss || 'water';
+        damageDescInput.value = claim.damage_description || '';
+        if (claim.has_policy_pdf) {
+          policyDropzone.classList.add('uploaded');
+          policyDropzoneText.textContent = '✅ Policy PDF Uploaded';
+          analyzeCoverageBtn.disabled = false;
+        }
+        if (claim.policy_analysis) renderPolicyAnalysis(claim.policy_analysis);
+        if (claim.cost_estimate) renderCostEstimate(claim.cost_estimate);
+      }
+    } catch (_) {}
+  });
+
+  // Policy Dropzone
+  policyDropzone.addEventListener('click', () => policyFileInput.click());
+  policyDropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    policyDropzone.classList.add('dragover');
+  });
+  policyDropzone.addEventListener('dragleave', () => policyDropzone.classList.remove('dragover'));
+  policyDropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    policyDropzone.classList.remove('dragover');
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handlePolicyFile(e.dataTransfer.files[0]);
+    }
+  });
+  policyFileInput.addEventListener('change', () => {
+    if (policyFileInput.files && policyFileInput.files.length > 0) {
+      handlePolicyFile(policyFileInput.files[0]);
+    }
+  });
+
+  async function handlePolicyFile(file) {
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Please upload an insurance policy PDF file.');
+      return;
+    }
+    const base = getBase();
+    const claimId = await ensureClaim();
+
+    showStatus('Uploading & indexing policy with RAG…', true);
+    policyDropzoneText.textContent = 'Indexing policy pages…';
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch(`${base}/api/v1/claims/${claimId}/policy/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      policyDropzone.classList.add('uploaded');
+      const pages = data.ingest_stats ? data.ingest_stats.total_pages : 'all';
+      policyDropzoneText.textContent = `✅ Policy Indexed (${pages} pages)`;
+      analyzeCoverageBtn.disabled = false;
+      showStatus('Policy PDF successfully indexed in vector store ✓', false);
+      setTimeout(hideStatus, 2500);
+    } catch (err) {
+      policyDropzoneText.textContent = 'Upload failed. Try again';
+      showStatus(`Policy upload failed: ${err.message}`, false);
+    }
+  }
+
+  // Analyze Coverage
+  analyzeCoverageBtn.addEventListener('click', async () => {
+    const claimId = await ensureClaim();
+    const base = getBase();
+
+    showStatus('Running legal policy coverage analysis…', true);
+    analyzeCoverageBtn.disabled = true;
+
+    try {
+      const res = await fetch(`${base}/api/v1/claims/${claimId}/policy/analyze`, {
+        method: 'POST',
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      renderPolicyAnalysis(data.analysis);
+      switchToClaimTab();
+      showStatus('Policy analysis complete ✓', false);
+      setTimeout(hideStatus, 2000);
+    } catch (e) {
+      showStatus(`Analysis failed: ${e.message}`, false);
+    } finally {
+      analyzeCoverageBtn.disabled = false;
+    }
+  });
+
+  function renderPolicyAnalysis(analysis) {
+    if (!analysis) return;
+
+    if (analysis.is_covered === true) {
+      coverageBadge.className = 'badge badge-success';
+      coverageBadge.textContent = '✓ Covered Loss';
+    } else if (analysis.is_covered === false) {
+      coverageBadge.className = 'badge badge-danger';
+      coverageBadge.textContent = '✕ Excluded / Not Covered';
+    } else {
+      coverageBadge.className = 'badge badge-warning';
+      coverageBadge.textContent = '⚠ Ambiguous Coverage';
+    }
+
+    let html = '';
+    html += '<div class="analysis-meta-grid">';
+    html += `<div class="analysis-stat"><div class="stat-label">Deductible</div><div class="stat-val">${analysis.deductible != null ? '$' + Number(analysis.deductible).toLocaleString() : 'Standard'}</div></div>`;
+    html += `<div class="analysis-stat"><div class="stat-label">Coverage Limit</div><div class="stat-val">${analysis.coverage_limit != null ? '$' + Number(analysis.coverage_limit).toLocaleString() : 'Dwelling Limit'}</div></div>`;
+    html += '</div>';
+
+    if (analysis.reasoning) {
+      html += `<div style="font-size: 0.85rem; line-height: 1.45; color: var(--text);"><strong style="color: #a78bfa;">Legal Opinion:</strong> ${analysis.reasoning}</div>`;
+    }
+
+    if (analysis.relevant_clauses && analysis.relevant_clauses.length > 0) {
+      html += '<div style="margin-top: 8px;"><strong style="font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase;">Cited Policy Clauses:</strong></div>';
+      analysis.relevant_clauses.forEach(c => {
+        html += `
+          <div class="clause-item">
+            <div class="clause-header">
+              <span class="clause-section">${c.section || 'POLICY CLAUSE'}</span>
+              <span class="clause-page">${c.page ? 'Page ' + c.page : ''}</span>
+            </div>
+            <div class="clause-quote">"${c.clause}"</div>
+          </div>
+        `;
+      });
+    }
+
+    if (analysis.duties_after_loss && analysis.duties_after_loss.length > 0) {
+      html += '<div style="margin-top: 6px;"><strong style="font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase;">Policyholder Duties After Loss:</strong><div>';
+      analysis.duties_after_loss.forEach(d => {
+        html += `<span class="duty-pill">📋 ${d}</span>`;
+      });
+      html += '</div></div>';
+    }
+
+    policyAnalysisBody.innerHTML = html;
+  }
+
+  // Estimate Costs
+  estimateCostsBtn.addEventListener('click', async () => {
+    const claimId = await ensureClaim();
+    const base = getBase();
+
+    showStatus('Calculating itemized repair costs…', true);
+    estimateCostsBtn.disabled = true;
+
+    try {
+      const res = await fetch(`${base}/api/v1/claims/${claimId}/estimate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ overhead_and_profit_pct: 10.0 }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      renderCostEstimate(data.cost_estimate);
+      switchToClaimTab();
+      showStatus('Cost estimate generated ✓', false);
+      setTimeout(hideStatus, 2000);
+    } catch (e) {
+      showStatus(`Cost estimation failed: ${e.message}`, false);
+    } finally {
+      estimateCostsBtn.disabled = false;
+    }
+  });
+
+  function renderCostEstimate(estimate) {
+    if (!estimate) return;
+
+    payoutBadge.className = 'badge badge-success';
+    payoutBadge.textContent = `$${estimate.net_claim_payout.toLocaleString(undefined, {minimumFractionDigits: 2})} Net Payout`;
+
+    let html = '';
+    html += `<div style="font-size: 0.85rem; color: var(--text); margin-bottom: 6px;"><strong>Scope:</strong> ${estimate.damage_summary}</div>`;
+
+    if (estimate.line_items && estimate.line_items.length > 0) {
+      html += `
+        <table class="cost-table">
+          <thead>
+            <tr>
+              <th>Repair Item</th>
+              <th>Qty</th>
+              <th>Unit Rate</th>
+              <th style="text-align: right;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+      estimate.line_items.forEach(it => {
+        html += `
+          <tr>
+            <td>
+              <div style="font-weight: 500;">${it.description || it.item}</div>
+              <div style="font-size: 0.72rem; color: var(--text-dim);">${it.location ? it.location + ' · ' : ''}${it.justification || ''}</div>
+            </td>
+            <td>${it.quantity} ${it.unit}</td>
+            <td>$${it.unit_total_usd}/${it.unit}</td>
+            <td style="text-align: right; font-weight: 600;">$${it.total_usd.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+          </tr>
+        `;
+      });
+      html += '</tbody></table>';
+    }
+
+    // Cost summary
+    html += `
+      <div class="cost-summary-box">
+        <div class="cost-summary-row"><span>Material Subtotal:</span><span>$${estimate.subtotal_material_usd.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>
+        <div class="cost-summary-row"><span>Labor Subtotal:</span><span>$${estimate.subtotal_labor_usd.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>
+        <div class="cost-summary-row"><span>Contractor O&P (${estimate.overhead_and_profit_pct}%):</span><span>$${estimate.overhead_and_profit_usd.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>
+        <div class="cost-summary-row" style="font-weight: 600; color: var(--text); border-top: 1px solid var(--border); padding-top: 4px;"><span>Gross Repair Estimate:</span><span>$${estimate.gross_estimate_usd.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>
+        ${estimate.deductible_usd != null ? `<div class="cost-summary-row" style="color: var(--orange);"><span>Less Policy Deductible:</span><span>-$${estimate.deductible_usd.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>` : ''}
+      </div>
+      <div class="payout-highlight">
+        <span class="payout-label">Estimated Net Claim Payout</span>
+        <span class="payout-amount">$${estimate.net_claim_payout.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+      </div>
+    `;
+
+    if (estimate.is_below_deductible) {
+      html += `<div style="margin-top: 8px; font-size: 0.8rem; color: var(--orange); background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25); border-radius: 6px; padding: 8px;">⚠ <strong>Notice:</strong> Estimated repair cost is less than your deductible. Filing this claim may not result in an insurance check.</div>`;
+    }
+
+    costEstimateBody.innerHTML = html;
+  }
+
+  // Interactive Chat
+  sendChatBtn.addEventListener('click', sendChatMessage);
+  chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendChatMessage();
+  });
+
+  async function sendChatMessage() {
+    const text = chatInput.value.trim();
+    if (!text) return;
+    chatInput.value = '';
+
+    appendChatMessage('user', text);
+
+    const claimId = await ensureClaim();
+    const base = getBase();
+
+    // Add typing indicator
+    const typingId = 'typing-' + Date.now();
+    const typingDiv = document.createElement('div');
+    typingDiv.className = 'chat-msg assistant';
+    typingDiv.id = typingId;
+    typingDiv.innerHTML = `
+      <div class="msg-avatar">🤖</div>
+      <div class="msg-bubble"><span style="color: var(--text-dim); font-style: italic;">Consulting policy & scan metrics…</span></div>
+    `;
+    chatMessages.appendChild(typingDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    try {
+      const res = await fetch(`${base}/api/v1/claims/${claimId}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      });
+      document.getElementById(typingId)?.remove();
+
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      appendChatMessage('assistant', data.reply, data.intent, data.sources);
+    } catch (e) {
+      document.getElementById(typingId)?.remove();
+      appendChatMessage('assistant', `Sorry, I encountered an issue: ${e.message}`);
+    }
+  }
+
+  function appendChatMessage(role, text, intent = null, sources = []) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `chat-msg ${role}`;
+
+    let metaHtml = '';
+    if (intent) {
+      const intentClass = intent === 'POLICY' ? 'badge-accent' : intent === 'COST' ? 'badge-success' : intent === 'GEOMETRY' ? 'badge-info' : 'badge-neutral';
+      metaHtml += `<div class="msg-meta"><span class="badge ${intentClass}">${intent}</span></div>`;
+    }
+
+    let sourcesHtml = '';
+    if (sources && sources.length > 0) {
+      sourcesHtml += '<div style="margin-top: 6px;">';
+      sources.slice(0, 3).forEach(s => {
+        const title = s.section ? `${s.section} ${s.page ? '(p. ' + s.page + ')' : ''}` : (s.reference || 'Source');
+        sourcesHtml += `<span class="source-chip">📄 ${title}</span> `;
+      });
+      sourcesHtml += '</div>';
+    }
+
+    const formattedText = text.replace(/\n/g, '<br/>');
+
+    if (role === 'assistant') {
+      msgDiv.innerHTML = `
+        <div class="msg-avatar">🤖</div>
+        <div class="msg-bubble">
+          ${metaHtml}
+          <div class="msg-content">${formattedText}</div>
+          ${sourcesHtml}
+        </div>
+      `;
+    } else {
+      msgDiv.innerHTML = `
+        <div class="msg-bubble">
+          <div class="msg-content">${formattedText}</div>
+        </div>
+      `;
+    }
+
+    chatMessages.appendChild(msgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+}
+
