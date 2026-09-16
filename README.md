@@ -63,6 +63,35 @@ Once started:
 
 ---
 
+## 🐳 Pods & Quick Reference
+
+The backend is split into four Docker Compose services ("pods"):
+
+| Pod | Container name | Purpose |
+|---|---|---|
+| `db` | `floorplan_db` | PostgreSQL 16 (job state + results) |
+| `redis` | `floorplan_redis` | Celery broker + result backend |
+| `api` | `floorplan_api` | FastAPI (Swagger: http://localhost:8000/docs) |
+| `worker` | `floorplan_worker` | Celery worker running COLMAP/Open3D |
+
+One-line commands:
+
+```bash
+./run.sh status              # check pod status/health
+./run.sh restart             # restart all pods
+./run.sh start -d            # start/rebuild all pods in background
+./run.sh logs worker         # follow a single pod's logs
+./run.sh stop                # stop all pods
+
+# Run the pipeline end-to-end (creates job, uploads, processes, prints dashboard link)
+./run.sh test video 3.2 ./7578547-uhd_3840_2160_30fps.mp4
+./run.sh test photos ./extracted_frames/
+./run.sh test lidar my_room.json
+./run.sh test hybrid my_room.json my_video.mp4
+```
+
+---
+
 ## 🧪 Testing the Pipeline (End-to-End)
 
 Once your backend is running, you can open a **new terminal window** and use the test commands to simulate exactly what the iOS app does. 

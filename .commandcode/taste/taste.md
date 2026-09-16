@@ -23,3 +23,4 @@ complete todo list of all parts created upfront before implementation begins. Co
 - Prefers to keep the project scoped narrowly: focused on 3D reconstruction + floor-plan only, with the LLM/insurance-claim agent path deliberately removed. Confidence: 0.8
 - Prefers to isolate structural refactors and feature removals on a dedicated git branch, using commit history to locate the relevant baseline first. Confidence: 0.7
 - When stripping a feature, prefers surgical removal from current HEAD (preserving recent improvements like observability) over reverting to an older clean commit. Confidence: 0.6
+- Wants operational/lifecycle commands persisted in project docs (e.g., README.md) as a quick-reference runbook for future reuse — service table plus one-line status/restart/start/logs/stop and pipeline commands. Confidence: 0.8

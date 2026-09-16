@@ -1,0 +1,347 @@
+"""
+FastAPI endpoints for Insurance Claims and Policy RAG.
+"""
+from pathlib import Path
+from typing import Any, Optional
+import aiofiles
+import structlog
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.agents.cost_engine import CostEngine
+from app.agents.policy_rag import PolicyRAGEngine
+from app.config import get_claim_dir, settings
+from app.main import get_db
+from app.models.claim import Claim, ClaimStatus
+from app.models.job import Job
+
+log = structlog.get_logger()
+router = APIRouter()
+
+rag_engine = PolicyRAGEngine()
+cost_engine = CostEngine()
+
+
+# ── Pydantic Request / Response Schemas ─────────────────────────────────────────
+class ClaimCreateRequest(BaseModel):
+    job_id: Optional[str] = Field(None, description="Optional associated 3D reconstruction job UUID")
+    property_type: str = Field("residential", description="residential | commercial | industrial")
+    damage_description: str = Field(..., description="Detailed description of the damage")
+    cause_of_loss: str = Field("water", description="water | fire | wind | hail | other")
+    date_of_loss: Optional[str] = Field(None, description="YYYY-MM-DD or date string")
+    policy_number: Optional[str] = Field(None, description="Policy ID number")
+    insurer_name: Optional[str] = Field(None, description="Insurance provider name")
+
+
+class CostEstimateRequest(BaseModel):
+    overhead_and_profit_pct: float = Field(10.0, description="Contractor Overhead & Profit percentage")
+    deductible_override: Optional[float] = Field(None, description="Override deductible amount")
+    coverage_limit_override: Optional[float] = Field(None, description="Override coverage limit amount")
+
+
+
+class ClaimQueryRequest(BaseModel):
+    question: str = Field(..., description="Natural language question about coverage or policy terms")
+
+
+class ClaimResponse(BaseModel):
+    id: str
+    job_id: Optional[str] = None
+    status: str
+    property_type: str
+    damage_description: str
+    cause_of_loss: str
+    date_of_loss: Optional[str] = None
+    policy_number: Optional[str] = None
+    insurer_name: Optional[str] = None
+    has_policy_pdf: bool = False
+    policy_analysis: Optional[dict[str, Any]] = None
+    cost_estimate: Optional[dict[str, Any]] = None
+    total_estimated_cost: Optional[float] = None
+    created_at: Optional[Any] = None
+    updated_at: Optional[Any] = None
+
+
+
+# ── Endpoints ──────────────────────────────────────────────────────────────────
+@router.post("", response_model=ClaimResponse, status_code=201)
+async def create_claim(
+    payload: ClaimCreateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a new insurance claim record."""
+    if payload.job_id:
+        # Verify job exists if provided
+        job = await db.get(Job, payload.job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job {payload.job_id} not found")
+
+    claim = Claim(
+        job_id=payload.job_id,
+        property_type=payload.property_type,
+        damage_description=payload.damage_description,
+        cause_of_loss=payload.cause_of_loss,
+        date_of_loss=payload.date_of_loss,
+        policy_number=payload.policy_number,
+        insurer_name=payload.insurer_name,
+        status=ClaimStatus.created,
+    )
+    db.add(claim)
+    await db.commit()
+    await db.refresh(claim)
+    log.info("claim_created", claim_id=claim.id)
+    return claim
+
+
+@router.get("", response_model=list[ClaimResponse])
+async def list_claims(
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+):
+    """List recent claims ordered by creation time."""
+    stmt = select(Claim).order_by(Claim.created_at.desc()).limit(limit)
+    res = await db.execute(stmt)
+    return res.scalars().all()
+
+
+@router.get("/{claim_id}", response_model=ClaimResponse)
+async def get_claim(
+    claim_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Fetch details and status of an insurance claim."""
+    claim = await db.get(Claim, claim_id)
+    if not claim:
+        raise HTTPException(status_code=404, detail=f"Claim {claim_id} not found")
+    return claim
+
+
+@router.post("/{claim_id}/policy/upload")
+async def upload_policy(
+    claim_id: str,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Upload and index a policy PDF into the ChromaDB vector store.
+    Extracts text page-by-page, performs section-aware chunking, and indexes embeddings.
+    """
+    claim = await db.get(Claim, claim_id)
+    if not claim:
+        raise HTTPException(status_code=404, detail=f"Claim {claim_id} not found")
+
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported for policy documents")
+
+    claim_dir = get_claim_dir(claim_id)
+    pdf_path = claim_dir / "policy.pdf"
+
+    # Save PDF to disk
+    claim.status = ClaimStatus.policy_uploading
+    await db.commit()
+
+    try:
+        async with aiofiles.open(pdf_path, "wb") as f:
+            while chunk := await file.read(1024 * 1024):
+                await f.write(chunk)
+
+        # Ingest into vector store
+        ingest_stats = rag_engine.ingest_policy(claim_id, pdf_path)
+
+        claim.has_policy_pdf = True
+        claim.policy_pdf_path = str(pdf_path)
+        claim.status = ClaimStatus.policy_indexed
+        await db.commit()
+        await db.refresh(claim)
+
+        return {
+            "status": "success",
+            "message": "Policy document successfully ingested and indexed.",
+            "ingest_stats": ingest_stats,
+            "claim": claim,
+        }
+
+    except Exception as e:
+        log.error("policy_upload_error", claim_id=claim_id, error=str(e))
+        claim.status = ClaimStatus.failed
+        claim.error_message = f"Policy indexing failed: {str(e)}"
+        await db.commit()
+        raise HTTPException(status_code=500, detail=f"Failed to process policy: {str(e)}")
+
+
+@router.post("/{claim_id}/policy/analyze")
+async def analyze_claim_policy(
+    claim_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Run RAG-augmented legal policy analysis on the claim.
+    Correlates cause of loss, damage description, and 3D reconstruction measurements
+    with the policy's coverages, perils, and exclusion clauses.
+    """
+    claim = await db.get(Claim, claim_id)
+    if not claim:
+        raise HTTPException(status_code=404, detail=f"Claim {claim_id} not found")
+
+    if not claim.has_policy_pdf:
+        raise HTTPException(
+            status_code=400,
+            detail="No policy PDF has been uploaded for this claim yet. Please upload a policy first.",
+        )
+
+    # Fetch 3D reconstruction metrics if linked
+    reconstruction_metrics = None
+    if claim.job_id:
+        job = await db.get(Job, claim.job_id)
+        if job and job.result_payload:
+            reconstruction_metrics = {
+                "room_area_m2": job.room_area_m2,
+                "wall_count": job.wall_count,
+                "damage_area_m2": job.result_payload.get("damage_area_m2"),
+            }
+
+    claim.status = ClaimStatus.analyzing_policy
+    await db.commit()
+
+    try:
+        claim_data = {
+            "cause_of_loss": claim.cause_of_loss,
+            "damage_description": claim.damage_description,
+            "property_type": claim.property_type,
+        }
+        analysis = rag_engine.analyze_coverage(
+            claim_id=claim_id,
+            claim_data=claim_data,
+            reconstruction_metrics=reconstruction_metrics,
+        )
+
+        claim.policy_analysis = analysis.to_dict()
+        claim.status = ClaimStatus.policy_indexed
+        await db.commit()
+        await db.refresh(claim)
+
+        return {
+            "status": "success",
+            "claim_id": claim_id,
+            "analysis": claim.policy_analysis,
+        }
+    except Exception as e:
+        log.error("policy_analyze_error", claim_id=claim_id, error=str(e))
+        claim.status = ClaimStatus.failed
+        claim.error_message = f"Policy analysis failed: {str(e)}"
+        await db.commit()
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+
+@router.post("/{claim_id}/policy/query")
+async def query_claim_policy(
+    claim_id: str,
+    payload: ClaimQueryRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Natural Language Query endpoint for policy questions.
+    Retrieves the most relevant policy clauses from ChromaDB and generates an answer citing sections and pages.
+    """
+    claim = await db.get(Claim, claim_id)
+    if not claim:
+        raise HTTPException(status_code=404, detail=f"Claim {claim_id} not found")
+
+    if not claim.has_policy_pdf:
+        raise HTTPException(
+            status_code=400,
+            detail="No policy PDF has been uploaded for this claim yet. Please upload a policy first.",
+        )
+
+    try:
+        claim_data = {
+            "cause_of_loss": claim.cause_of_loss,
+            "damage_description": claim.damage_description,
+        }
+        res = rag_engine.query_policy(
+            claim_id=claim_id,
+            question=payload.question,
+            claim_data=claim_data,
+        )
+        return res
+    except Exception as e:
+        log.error("policy_query_error", claim_id=claim_id, error=str(e))
+        raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
+
+
+@router.post("/{claim_id}/estimate")
+async def estimate_claim_costs(
+    claim_id: str,
+    payload: Optional[CostEstimateRequest] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Generate itemized repair cost estimation for a claim.
+    Combines 3D reconstruction measurements (room area, wall dimensions, damage surface)
+    with the rate table and applies deductible/limits from policy analysis.
+    """
+    claim = await db.get(Claim, claim_id)
+    if not claim:
+        raise HTTPException(status_code=404, detail=f"Claim {claim_id} not found")
+
+    # Fetch 3D reconstruction metrics if linked
+    reconstruction_metrics = None
+    if claim.job_id:
+        job = await db.get(Job, claim.job_id)
+        if job and job.result_payload:
+            reconstruction_metrics = {
+                "room_area_m2": job.room_area_m2,
+                "wall_count": job.wall_count,
+                "walls": job.result_payload.get("walls", []),
+                "damage_area_m2": job.result_payload.get("damage_area_m2"),
+            }
+
+    claim.status = ClaimStatus.estimating_costs
+    await db.commit()
+
+    req = payload or CostEstimateRequest()
+    try:
+        claim_data = {
+            "cause_of_loss": claim.cause_of_loss,
+            "damage_description": claim.damage_description,
+            "property_type": claim.property_type,
+        }
+
+        # Use overrides if provided, otherwise default to policy analysis
+        policy_analysis = claim.policy_analysis or {}
+        if req.deductible_override is not None:
+            policy_analysis = dict(policy_analysis)
+            policy_analysis["deductible"] = req.deductible_override
+        if req.coverage_limit_override is not None:
+            policy_analysis = dict(policy_analysis)
+            policy_analysis["coverage_limit"] = req.coverage_limit_override
+
+        estimate = cost_engine.estimate_claim(
+            claim_id=claim_id,
+            claim_data=claim_data,
+            reconstruction_metrics=reconstruction_metrics,
+            policy_analysis=policy_analysis,
+            overhead_and_profit_pct=req.overhead_and_profit_pct,
+        )
+
+        claim.cost_estimate = estimate.to_dict()
+        claim.total_estimated_cost = estimate.net_claim_payout
+        claim.status = ClaimStatus.complete
+        await db.commit()
+        await db.refresh(claim)
+
+        return {
+            "status": "success",
+            "claim_id": claim_id,
+            "cost_estimate": claim.cost_estimate,
+            "total_estimated_cost": claim.total_estimated_cost,
+        }
+    except Exception as e:
+        log.error("cost_estimation_error", claim_id=claim_id, error=str(e))
+        claim.status = ClaimStatus.failed
+        claim.error_message = f"Cost estimation failed: {str(e)}"
+        await db.commit()
+        raise HTTPException(status_code=500, detail=f"Cost estimation failed: {str(e)}")
+

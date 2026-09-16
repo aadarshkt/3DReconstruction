@@ -50,8 +50,25 @@ class Settings(BaseSettings):
     # Add mobile app origins and local dashboard here
     CORS_ORIGINS: list[str] = ["*"]       # tighten in production
 
+    # ── LLM / Agent Orchestration ─────────────────────────────────────────────
+    LLM_BASE_URL: str = "https://openrouter.ai/api/v1"
+    LLM_API_KEY: str = ""
+    LLM_MODEL: str = "openrouter/free"
+    LLM_TIMEOUT_S: int = 120
+    LLM_MAX_TOKENS: int = 4096
+
+    # ── RAG / Embeddings ──────────────────────────────────────────────────────
+    EMBEDDING_BASE_URL: str = "https://api.openai.com/v1"
+    EMBEDDING_API_KEY: str = ""
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    CHROMA_PERSIST_DIR: Path = Path("data/chromadb")
+    RAG_CHUNK_SIZE: int = 800
+    RAG_CHUNK_OVERLAP: int = 100
+    RAG_TOP_K: int = 6
+
 
 settings = Settings()
+
 
 
 def get_job_dir(job_id: str) -> Path:
@@ -78,3 +95,11 @@ def get_job_report_dir(job_id: str) -> Path:
     p = get_job_dir(job_id) / "reports"
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def get_claim_dir(claim_id: str) -> Path:
+    """Return the data directory for a specific claim, creating it if needed."""
+    p = settings.DATA_DIR / "claims" / claim_id
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+

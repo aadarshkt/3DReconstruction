@@ -22,8 +22,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
 from app.config import settings, get_results_dir, get_images_dir
-from app.models.job import Job, JobStatus, Tier
+from app.models import Job, JobStatus, Tier, Claim, ClaimStatus
 from app.pipeline.observability import RunDiagnostics
+
 
 log = structlog.get_logger()
 
@@ -212,3 +213,141 @@ def _run_pipeline_core(job_id: str):
 
 def _is_valid_status(stage: str) -> bool:
     return stage in {s.value for s in JobStatus}
+
+
+def _update_claim(db: Session, claim_id: str, **kwargs):
+    """Update claim fields and commit."""
+    claim = db.query(Claim).filter(Claim.id == claim_id).first()
+    if claim:
+        for k, v in kwargs.items():
+            setattr(claim, k, v)
+        db.commit()
+        db.refresh(claim)
+    return claim
+
+
+def _publish_claim_progress(claim_id: str, stage: str, pct: int, **extra):
+    """Publish claim progress on Redis pub/sub."""
+    payload = {
+        "claim_id": claim_id,
+        "stage": stage,
+        "pct": pct,
+        "timestamp": datetime.utcnow().isoformat(),
+        **extra,
+    }
+    try:
+        get_redis().publish(f"claim:{claim_id}:progress", json.dumps(payload))
+    except Exception as exc:
+        log.warning("redis_claim_publish_failed", error=str(exc))
+
+
+@celery_app.task(bind=True, name="ingest_policy_pdf_task", max_retries=1)
+def ingest_policy_pdf_task(self, claim_id: str, pdf_path: str):
+    """
+    Celery background task to extract, chunk, embed, and index a policy PDF into ChromaDB.
+    """
+    from app.agents.policy_rag import PolicyRAGEngine
+    db = get_sync_db()
+    try:
+        _update_claim(db, claim_id, status=ClaimStatus.policy_uploading)
+        _publish_claim_progress(claim_id, "policy_uploading", 20)
+
+        rag = PolicyRAGEngine()
+        stats = rag.ingest_policy(claim_id, pdf_path)
+
+        _update_claim(
+            db, claim_id,
+            status=ClaimStatus.policy_indexed,
+            has_policy_pdf=True,
+            policy_pdf_path=pdf_path,
+        )
+        _publish_claim_progress(claim_id, "policy_indexed", 100, stats=stats)
+        return {"claim_id": claim_id, "status": "policy_indexed", "stats": stats}
+    except Exception as exc:
+        log.error("ingest_policy_pdf_task_failed", claim_id=claim_id, error=str(exc))
+        _update_claim(db, claim_id, status=ClaimStatus.failed, error_message=str(exc)[:2000])
+        _publish_claim_progress(claim_id, "failed", 0, error=str(exc))
+        raise
+    finally:
+        db.close()
+
+
+@celery_app.task(bind=True, name="run_claim_analysis_task", max_retries=1)
+def run_claim_analysis_task(self, claim_id: str, overhead_and_profit_pct: float = 10.0):
+    """
+    Celery background task to run policy coverage analysis followed by deterministic cost estimation.
+    """
+    from app.agents.policy_rag import PolicyRAGEngine
+    from app.agents.cost_engine import CostEngine
+    db = get_sync_db()
+    try:
+        claim = db.query(Claim).filter(Claim.id == claim_id).first()
+        if not claim:
+            raise ValueError(f"Claim {claim_id} not found")
+
+        # 1. Policy Analysis
+        _update_claim(db, claim_id, status=ClaimStatus.analyzing_policy)
+        _publish_claim_progress(claim_id, "analyzing_policy", 30)
+
+        reconstruction_metrics = None
+        if claim.job_id:
+            job = db.query(Job).filter(Job.id == claim.job_id).first()
+            if job and job.result_payload:
+                reconstruction_metrics = {
+                    "room_area_m2": job.room_area_m2,
+                    "wall_count": job.wall_count,
+                    "walls": job.result_payload.get("walls", []),
+                    "damage_area_m2": job.result_payload.get("damage_area_m2"),
+                }
+
+        claim_data = {
+            "cause_of_loss": claim.cause_of_loss,
+            "damage_description": claim.damage_description,
+            "property_type": claim.property_type,
+        }
+
+        policy_analysis_dict = None
+        if claim.has_policy_pdf:
+            rag = PolicyRAGEngine()
+            analysis = rag.analyze_coverage(
+                claim_id=claim_id,
+                claim_data=claim_data,
+                reconstruction_metrics=reconstruction_metrics,
+            )
+            policy_analysis_dict = analysis.to_dict()
+            _update_claim(db, claim_id, policy_analysis=policy_analysis_dict)
+
+        # 2. Cost Estimation
+        _update_claim(db, claim_id, status=ClaimStatus.estimating_costs)
+        _publish_claim_progress(claim_id, "estimating_costs", 70)
+
+        cost_eng = CostEngine()
+        estimate = cost_eng.estimate_claim(
+            claim_id=claim_id,
+            claim_data=claim_data,
+            reconstruction_metrics=reconstruction_metrics,
+            policy_analysis=policy_analysis_dict,
+            overhead_and_profit_pct=overhead_and_profit_pct,
+        )
+
+        estimate_dict = estimate.to_dict()
+        _update_claim(
+            db, claim_id,
+            cost_estimate=estimate_dict,
+            total_estimated_cost=estimate.net_claim_payout,
+            status=ClaimStatus.complete,
+        )
+        _publish_claim_progress(
+            claim_id, "complete", 100,
+            total_cost=estimate.net_claim_payout,
+            gross_cost=estimate.gross_estimate_usd,
+        )
+        return {"claim_id": claim_id, "status": "complete", "cost_estimate": estimate_dict}
+    except Exception as exc:
+        log.error("run_claim_analysis_task_failed", claim_id=claim_id, error=str(exc))
+        _update_claim(db, claim_id, status=ClaimStatus.failed, error_message=str(exc)[:2000])
+        _publish_claim_progress(claim_id, "failed", 0, error=str(exc))
+        raise
+    finally:
+        db.close()
+

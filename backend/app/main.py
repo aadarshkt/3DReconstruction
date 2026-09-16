@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
-from app.models.job import Base
+from app.models import Base, Job, Claim
 # ── Database engine / session factory ─────────────────────────────────────────
 engine = create_async_engine(settings.DATABASE_URL, echo=settings.DEBUG, future=True)
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -33,6 +33,7 @@ async def get_db() -> AsyncSession:
 from app.api import jobs as jobs_router
 from app.api import uploads as uploads_router
 from app.api import results as results_router
+from app.api import claims as claims_router
 
 log = structlog.get_logger()
 
@@ -80,6 +81,9 @@ app.add_middleware(
 app.include_router(jobs_router.router,    prefix="/jobs",    tags=["Jobs"])
 app.include_router(uploads_router.router, prefix="/jobs",    tags=["Uploads"])
 app.include_router(results_router.router, prefix="/jobs",    tags=["Results"])
+app.include_router(claims_router.router,  prefix="/api/v1/claims", tags=["Claims"])
+app.include_router(claims_router.router,  prefix="/claims",        tags=["Claims"])
+
 
 # ── Dashboard & Static files ──────────────────────────────────────────────────
 dashboard_dir = Path("/app/web_dashboard")
