@@ -245,16 +245,72 @@ In your backend ECS Task Definition JSON, reference the SSM parameter ARNs:
 
 1. **Database Schema Auto-Creation**:
    - Ensure your FastAPI startup sequence includes `await conn.run_sync(Base.metadata.create_all)`. On the first ECS launch, SQLAlchemy automatically connects to RDS and creates the `users` table.
-2. **Promoting the First Admin**:
-   - Since the RDS database is private inside the VPC, use the automatic environment variable `INITIAL_ADMIN_EMAIL=admin@yourcompany.com`.
-   - When that email performs its first Google sign-in, the backend automatically sets `role = "admin"`.
-   - Subsequent role promotions can be executed via ECS run-task:
-     ```bash
-     aws ecs run-task \
-       --cluster claimspace-cluster \
-       --task-definition claimspace-backend \
-       --overrides '{"containerOverrides": [{"name": "backend", "command": ["python", "-m", "app.cli", "set-role", "--email", "staff@example.com", "--role", "admin"]}]}'
-     ```
+2. **Promoting / Creating Admin Roles for Known Users**:
+   Once a user has signed in with their known email address (e.g. `lead.admin@company.com`), use any of the following methods to grant them the `admin` role:
+
+   #### Method A: AWS ECS One-Off Task (Recommended for Production AWS)
+   Run a standalone task on your ECS cluster to execute the role update CLI inside the VPC network:
+   ```bash
+   aws ecs run-task \
+     --cluster claimspace-cluster \
+     --task-definition claimspace-backend \
+     --launch-type FARGATE \
+     --network-configuration "awsvpcConfiguration={subnets=[\"<PRIVATE_SUBNET_ID>\"],securityGroups=[\"<ECS_BACKEND_SG_ID>\"],assignPublicIp=\"DISABLED\"}" \
+     --overrides '{
+       "containerOverrides": [
+         {
+           "name": "backend",
+           "command": ["python", "-m", "app.cli", "set-role", "--email", "lead.admin@company.com", "--role", "admin"]
+         }
+       ]
+     }'
+   ```
+
+   #### Method B: AWS ECS Exec (Interactive Shell in Running Container)
+   If you have enabled `enable-execute-command` on your ECS service, jump into the running container:
+   ```bash
+   # 1. Get task ID
+   TASK_ID=$(aws ecs list-tasks --cluster claimspace-cluster --service-name claimspace-backend-service --query 'taskArns[0]' --output text | cut -d/ -f3)
+
+   # 2. Open interactive shell
+   aws ecs execute-command \
+     --cluster claimspace-cluster \
+     --task $TASK_ID \
+     --container backend \
+     --interactive \
+     --command "/bin/sh"
+
+   # 3. Inside the container, run the CLI:
+   python -m app.cli set-role --email lead.admin@company.com --role admin
+   python -m app.cli list-users
+   ```
+
+   #### Method C: Direct SQL Update on Amazon RDS PostgreSQL
+   If you have an internal bastion host, VPN, or SSM session to your RDS instance:
+   ```sql
+   -- 1. Check existing role for the user:
+   SELECT id, email, role, created_at FROM users WHERE email = 'lead.admin@company.com';
+
+   -- 2. Promote user to admin:
+   UPDATE users SET role = 'admin' WHERE email = 'lead.admin@company.com';
+
+   -- 3. Confirm promotion:
+   SELECT email, role FROM users WHERE email = 'lead.admin@company.com';
+   ```
+
+   #### Method D: Automatic Bootstrap on First Sign-In (`INITIAL_ADMIN_EMAIL`)
+   In your ECS task definition or `.env` configuration, specify the primary administrator's email:
+   ```bash
+   INITIAL_ADMIN_EMAIL=lead.admin@company.com
+   ```
+   When that email signs in with Google for the very first time, the backend automatically flags their account as `role = 'admin'`.
+
+   #### Method E: Local / Staging CLI Command
+   ```bash
+   cd backend
+   PYTHONPATH=. ../.venv/bin/python -m app.cli set-role --email lead.admin@company.com --role admin
+   PYTHONPATH=. ../.venv/bin/python -m app.cli list-users
+   ```
 3. **CORS & Domain Cookie Alignment**:
    - When deploying on AWS with an ALB:
      - Frontend URL: `https://app.claimspace.com`
