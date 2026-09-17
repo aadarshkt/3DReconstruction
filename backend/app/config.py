@@ -50,6 +50,16 @@ class Settings(BaseSettings):
     # Add mobile app origins and local dashboard here
     CORS_ORIGINS: list[str] = ["*"]       # tighten in production
 
+    # ── Authentication & Google OAuth ─────────────────────────────────────────
+    JWT_SECRET_KEY: str = "super_secret_jwt_key_claimspace_change_in_production_2026"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRATION_MINUTES: int = 60 * 24 * 7  # 7 days
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    INITIAL_ADMIN_EMAIL: str = "admin@claimspace.com"
+    FRONTEND_URL: str = "http://localhost:3000"
+    ALLOW_DEV_LOGIN: bool = True  # Set to False or disable in production
+
     # ── LLM / Agent Orchestration ─────────────────────────────────────────────
     LLM_BASE_URL: str = "https://openrouter.ai/api/v1"
     LLM_API_KEY: str = ""

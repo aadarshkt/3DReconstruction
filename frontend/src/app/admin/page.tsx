@@ -4,8 +4,10 @@ import React, { useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import SpatialViewer from "@/components/SpatialViewer";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AdminConsolePage() {
+  const { user, token, isAdmin, loading, loginDev } = useAuth();
   const [serverUrl, setServerUrl] = useState("http://localhost:8000");
   const [jobId, setJobId] = useState("a441e175-fa81-54b1-872f-532658f8b0fa");
   const [claimId, setClaimId] = useState("9a4de56b-a2eb-5eb6-86fe-6ecb8d78daec");
@@ -30,10 +32,13 @@ export default function AdminConsolePage() {
     addLog("Initiating full closed-loop pipeline automated test sequence...");
 
     try {
-      // Step 1: Seed 3D Scan
+      // Step 1: Seed 3D Scan (Admin authorization header)
       setStepStatus((s) => ({ ...s, scan: "Running..." }));
       addLog("Executing Step 1: POST /claims/seed-demo (native LiDAR 24.5 m² + ISO HO-3)...");
-      const seedRes = await fetch("/claims/seed-demo", { method: "POST" });
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const seedRes = await fetch("/claims/seed-demo", { method: "POST", headers });
       if (!seedRes.ok) throw new Error(await seedRes.text());
       const seedData = await seedRes.json();
       if (seedData.job_id) setJobId(seedData.job_id);
@@ -100,6 +105,75 @@ export default function AdminConsolePage() {
       setIsRunningTest(false);
     }
   };
+
+  // Strict Access Guard: Only admin can see Admin Console
+  if (!loading && !isAdmin) {
+    return (
+      <div className="min-h-screen flex flex-col selection:bg-[var(--accent)] selection:text-white">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center p-6">
+          <div
+            className="w-full max-w-md rounded-2xl border p-8 sm:p-10 text-center space-y-6 shadow-sm"
+            style={{
+              backgroundColor: "var(--bg-card)",
+              borderColor: "var(--border-default)",
+            }}
+          >
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 border border-amber-500/20">
+              <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            </div>
+
+            <div className="space-y-2">
+              <h1 className="font-serif text-2xl font-medium text-[var(--text-primary)]">
+                Administrator Access Required
+              </h1>
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                {user ? (
+                  <>
+                    You are currently signed in as <strong>{user.email}</strong> with role{" "}
+                    <span className="font-mono text-blue-500 uppercase">[{user.role}]</span>.
+                    The Admin Console is restricted strictly to administrators.
+                  </>
+                ) : (
+                  "You must sign in with an authorized administrator account to access this workstation."
+                )}
+              </p>
+            </div>
+
+            <div className="pt-2 flex flex-col gap-2.5">
+              <Link
+                href="/portal"
+                className="btn-squish w-full rounded-xl py-2.5 text-xs font-semibold text-white shadow-sm transition-all"
+                style={{ backgroundColor: "var(--accent)" }}
+              >
+                Go to User Console (/portal) →
+              </Link>
+
+              {user?.role !== "admin" && (
+                <button
+                  onClick={() => loginDev("admin")}
+                  className="btn-squish w-full rounded-xl py-2 text-xs font-semibold border border-[var(--border-default)] hover:border-amber-500 text-[var(--text-secondary)] hover:text-amber-600 transition-colors"
+                  style={{ backgroundColor: "var(--bg-surface)" }}
+                >
+                  Switch to Admin Account (Test Login)
+                </button>
+              )}
+
+              <Link
+                href="/login"
+                className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] underline underline-offset-2"
+              >
+                Sign In with a different account
+              </Link>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col selection:bg-[var(--accent)] selection:text-white">

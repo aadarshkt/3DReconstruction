@@ -33,6 +33,7 @@ pydantic-settings==2.3.1
 python-dotenv==1.0.1
 aiofiles==23.2.1                # async file I/O
 structlog==24.1.0               # structured logging
+pyjwt>=2.8.0                    # JWT tokens for OAuth & RBAC
 
 # ── Validation / testing ──────────────────────────────────────────────────────
 pytest==8.2.2

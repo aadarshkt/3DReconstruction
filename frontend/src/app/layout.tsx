@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { AuthProvider } from "@/context/AuthContext";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -35,7 +36,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen flex flex-col transition-colors duration-200 pb-[env(safe-area-inset-bottom,0px)]">
-        <ThemeProvider>{children}</ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider>{children}</ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );

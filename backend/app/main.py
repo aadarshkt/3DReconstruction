@@ -19,21 +19,14 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
-from app.models import Base, Job, Claim
-# ── Database engine / session factory ─────────────────────────────────────────
-engine = create_async_engine(settings.DATABASE_URL, echo=settings.DEBUG, future=True)
-AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-
-async def get_db() -> AsyncSession:
-    """FastAPI dependency: yields an async DB session."""
-    async with AsyncSessionLocal() as session:
-        yield session
+from app.models import Base, Job, Claim, User
+from app.core.database import engine, AsyncSessionLocal, get_db
 
 from app.api import jobs as jobs_router
 from app.api import uploads as uploads_router
 from app.api import results as results_router
 from app.api import claims as claims_router
+from app.api import auth as auth_router
 
 log = structlog.get_logger()
 
@@ -68,16 +61,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── CORS (needed for iOS WKWebView and web dashboard) ─────────────────────────
+# ── CORS ───────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ── API routers ────────────────────────────────────────────────────────────────
+app.include_router(auth_router.router,    prefix="/api/v1")
+app.include_router(auth_router.router,    prefix="")
 app.include_router(jobs_router.router,    prefix="/jobs",    tags=["Jobs"])
 app.include_router(uploads_router.router, prefix="/jobs",    tags=["Uploads"])
 app.include_router(results_router.router, prefix="/jobs",    tags=["Results"])
