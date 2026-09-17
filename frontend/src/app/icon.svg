@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="cs-bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#24221F" />
+      <stop offset="100%" stop-color="#141312" />
+    </linearGradient>
+    <linearGradient id="cs-accent" x1="16" y1="12" x2="48" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F29E80" />
+      <stop offset="100%" stop-color="#C96442" />
+    </linearGradient>
+    <filter id="cs-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- Base container with rounded corners and subtle border -->
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#cs-bg)" stroke="#3E3A34" stroke-width="2.5" />
+
+  <!-- 3D Spatial Framing reticle markers (matching LiDAR & 3D scanner aesthetics) -->
+  <path d="M12 21V13H20" stroke="#7A7368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M44 13H52V21" stroke="#7A7368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M12 43V51H20" stroke="#7A7368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M44 51H52V43" stroke="#7A7368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Spatial depth scanner point -->
+  <circle cx="46" cy="18" r="2.5" fill="#E28362" />
+
+  <!-- Elegant ClaimSpace Serif "C" -->
+  <text
+    x="32"
+    y="44"
+    font-family="'Newsreader', Georgia, 'Times New Roman', serif"
+    font-size="34"
+    font-weight="700"
+    fill="url(#cs-accent)"
+    text-anchor="middle"
+    filter="url(#cs-shadow)"
+  >C</text>
+</svg>
