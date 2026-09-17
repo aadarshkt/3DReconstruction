@@ -42,7 +42,8 @@ export default function ConsolePreview() {
   ]);
   const [inputQuery, setInputQuery] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const chatStreamRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const isInitialMount = useRef(true);
 
   const quickPrompts = [
     { label: "💧 Is pipe burst covered?", q: "Is sudden water damage from a burst copper line covered under my policy?" },
@@ -124,7 +125,16 @@ export default function ConsolePreview() {
   };
 
   useEffect(() => {
-    chatStreamRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
   }, [messages, isTyping]);
 
   return (
@@ -348,7 +358,7 @@ export default function ConsolePreview() {
             </div>
 
             {/* Chat Stream */}
-            <div className="flex-1 overflow-y-auto max-h-[290px] my-3 pr-1 space-y-3">
+            <div ref={chatContainerRef} className="flex-1 overflow-y-auto max-h-[290px] my-3 pr-1 space-y-3">
               {messages.map((m) => {
                 const isUser = m.sender === "user";
                 return (
@@ -381,7 +391,6 @@ export default function ConsolePreview() {
                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce [animation-delay:0.4s]" />
                 </div>
               )}
-              <div ref={chatStreamRef} />
             </div>
 
             {/* Quick Prompt Chips */}

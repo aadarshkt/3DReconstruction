@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import WalkthroughModal from "@/components/WalkthroughModal";
@@ -8,6 +8,16 @@ import ConsolePreview from "@/components/ConsolePreview";
 
 export default function LandingPage() {
   const [isTourOpen, setIsTourOpen] = useState(false);
+
+  // If the browser reloads with leftover '#interactive-preview' hash, clear it and remain at the top
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash) {
+      if (window.location.hash === "#interactive-preview") {
+        window.history.replaceState(null, "", window.location.pathname);
+        window.scrollTo(0, 0);
+      }
+    }
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col selection:bg-[var(--accent)] selection:text-white">
