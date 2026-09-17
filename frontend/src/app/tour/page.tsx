@@ -108,11 +108,24 @@ export default function GuidedTourPage() {
           },
         },
         {
-          element: "#tour-workspace-card",
+          element: "#tour-footage-upload",
           popover: {
-            title: "1. Property Footage & 3D Spatial Scan",
+            title: "1. Property Footage Ingestion",
             description:
-              "Upload room photos, handheld video, or iPhone LiDAR exports. The pipeline extracts verified 2D vector blueprints (24.5 m²) and saturated water damage zones (18.2 m²) with ±0.8 cm metric precision.",
+              "Upload room photos, handheld video, or iPhone LiDAR exports. The system accepts standard mobile formats to initiate rapid spatial and geometric processing.",
+            side: "top",
+            align: "start",
+          },
+          onHighlightStarted: () => {
+            setActiveTab("footage");
+          },
+        },
+        {
+          element: "#tour-spatial-viewer",
+          popover: {
+            title: "2. 3D & 2D Reconstruction Viewer",
+            description:
+              "Interact with the reconstructed 3D point cloud model, or toggle to the dimensioned 2D architectural blueprint with localized damage boundaries.",
             side: "top",
             align: "start",
           },
@@ -123,9 +136,9 @@ export default function GuidedTourPage() {
         {
           element: "#tour-workspace-card",
           popover: {
-            title: "2. Insurance Policy Documents & Legal RAG",
+            title: "3. Insurance Policy Documents & Legal RAG",
             description:
-              "Attach homeowner or commercial policy contracts (e.g. standard ISO HO-3). Our legal RAG engine correlates physical damages with Peril 12 clauses, validates coverage limits ($350,000), and confirms the $1,000 deductible.",
+              "Attach homeowner or commercial policy contracts. Our legal RAG engine correlates physical damages with policy clauses, verifies covered perils, identifies applicable exclusions, and confirms deductible and coverage limit terms.",
             side: "top",
             align: "start",
           },
@@ -136,9 +149,9 @@ export default function GuidedTourPage() {
         {
           element: "#tour-workspace-card",
           popover: {
-            title: "3. Itemized Cost Calculation Engine",
+            title: "4. Itemized Cost Calculation Engine",
             description:
-              "Repair quantities map directly to the square meters measured in the 3D scan. The deterministic cost engine calculates drywall demolition, subfloor extraction, commercial drying, and contractor O&P ($4,101.47 net payout).",
+              "Repair scopes link directly to the physical measurements captured in the 3D scan. The cost engine calculates required labor, materials, and contractor rates to produce transparent, itemized estimates and net claim payouts.",
             side: "top",
             align: "start",
           },
@@ -149,7 +162,7 @@ export default function GuidedTourPage() {
         {
           element: "#tour-workspace-card",
           popover: {
-            title: "4. Conversational Claim Assistant",
+            title: "5. Conversational Claim Assistant",
             description:
               "Ask natural language questions regarding coverage status, deductible math, room geometry, or post-loss remediation steps. The assistant responds instantly citing policy page numbers and spatial measurements.",
             side: "top",

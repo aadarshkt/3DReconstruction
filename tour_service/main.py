@@ -5,7 +5,10 @@ Can be executed directly via: uvicorn tour_service.main:app --port 8001
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from tour_service.router import router as tour_router
+try:
+    from tour_service.router import router as tour_router
+except ImportError:
+    from router import router as tour_router
 
 app = FastAPI(
     title="ClaimSpace - Guided Tour Microservice",

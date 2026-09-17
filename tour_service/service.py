@@ -43,6 +43,7 @@ def get_tour_sample_claim() -> Dict[str, Any]:
         },
         "policy": {
             "has_policy_pdf": True,
+            "policy_pdf_url": "/api/v1/tour/artifacts/sample_ho3_policy.pdf",
             "policy_form": policy.get("policy_form", "ISO HO-3 Standard Homeowners"),
             "policy_number": policy.get("policy_number", "HO3-8829104-NY"),
             "deductible": policy.get("deductible", 1000.0),

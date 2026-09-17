@@ -6,11 +6,18 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from tour_service.service import (
-    ARTIFACTS_DIR,
-    get_tour_sample_claim,
-    handle_tour_chat,
-)
+try:
+    from tour_service.service import (
+        ARTIFACTS_DIR,
+        get_tour_sample_claim,
+        handle_tour_chat,
+    )
+except ImportError:
+    from service import (
+        ARTIFACTS_DIR,
+        get_tour_sample_claim,
+        handle_tour_chat,
+    )
 
 router = APIRouter()
 
@@ -54,6 +61,8 @@ async def get_tour_artifact(filename: str):
         media_type = "application/json"
     elif safe_name.endswith(".ply"):
         media_type = "text/plain"
+    elif safe_name.endswith(".pdf"):
+        media_type = "application/pdf"
 
     return FileResponse(file_path, media_type=media_type)
 

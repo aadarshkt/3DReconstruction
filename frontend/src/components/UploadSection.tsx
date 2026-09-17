@@ -367,7 +367,7 @@ export default function UploadSection({
       )}
 
       {/* Upload Dropzone Section */}
-      <div className="space-y-4">
+      <div id="tour-footage-upload" className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <span className="font-serif text-base sm:text-lg font-semibold text-[var(--text-primary)]">
             Upload Property Footage
@@ -455,7 +455,7 @@ export default function UploadSection({
       </div>
 
       {/* SPATIAL VIEWER: Renders clean empty state when no scanData is active */}
-      <div className="space-y-2 pt-6 border-t" style={{ borderColor: "var(--border-subtle)" }}>
+      <div id="tour-spatial-viewer" className="space-y-2 pt-6 border-t" style={{ borderColor: "var(--border-subtle)" }}>
         <div className="flex items-center justify-between flex-wrap gap-2">
           <span className="text-xs font-mono uppercase tracking-wider text-[var(--accent)] font-semibold">
             Interactive Visual Output

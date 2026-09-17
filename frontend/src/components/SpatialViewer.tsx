@@ -32,7 +32,7 @@ export default function SpatialViewer({
   hasData = false,
   isDemo = false,
 }: SpatialViewerProps) {
-  const [activeTab, setActiveTab] = useState<"floorplan" | "pointcloud">("floorplan");
+  const [activeTab, setActiveTab] = useState<"pointcloud" | "floorplan">("pointcloud");
 
   const defaultWalls: WallSegment[] = [
     { id: 1, length_m: 5.4, has_opening: false },
@@ -57,20 +57,6 @@ export default function SpatialViewer({
       >
         <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
           <button
-            onClick={() => setActiveTab("floorplan")}
-            className={`btn-squish flex-1 sm:flex-initial px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all text-center ${
-              activeTab === "floorplan"
-                ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm border"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            }`}
-            style={{
-              borderColor: activeTab === "floorplan" ? "var(--border-default)" : "transparent",
-            }}
-          >
-            <span className="hidden xs:inline sm:inline">2D Dimensioned Floor Plan</span>
-            <span className="xs:hidden sm:hidden">2D Floor Plan</span>
-          </button>
-          <button
             onClick={() => setActiveTab("pointcloud")}
             className={`btn-squish flex-1 sm:flex-initial px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all text-center ${
               activeTab === "pointcloud"
@@ -83,6 +69,20 @@ export default function SpatialViewer({
           >
             <span className="hidden xs:inline sm:inline">3D Point Cloud Model</span>
             <span className="xs:hidden sm:hidden">3D Point Cloud</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("floorplan")}
+            className={`btn-squish flex-1 sm:flex-initial px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all text-center ${
+              activeTab === "floorplan"
+                ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm border"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            }`}
+            style={{
+              borderColor: activeTab === "floorplan" ? "var(--border-default)" : "transparent",
+            }}
+          >
+            <span className="hidden xs:inline sm:inline">2D Dimensioned Floor Plan</span>
+            <span className="xs:hidden sm:hidden">2D Floor Plan</span>
           </button>
         </div>
 
@@ -116,7 +116,9 @@ export default function SpatialViewer({
       {/* Main Canvas Area */}
       <div className="px-3 sm:px-5">
         {!hasData ? (
-          activeTab === "floorplan" ? (
+          activeTab === "pointcloud" ? (
+            <PointcloudViewer plyUrl={plyUrl} hasScan={false} />
+          ) : (
             <div className="relative w-full h-[380px] sm:h-[440px] rounded-xl border flex flex-col items-center justify-center p-6 text-center bg-[#181716] border-[var(--border-subtle)]">
               <svg className="w-16 h-16 text-[var(--border-strong)] mb-3" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <rect x="8" y="8" width="32" height="32" rx="4" strokeDasharray="4 3" />
@@ -129,10 +131,10 @@ export default function SpatialViewer({
                 Upload room photos, video, or iPhone LiDAR to generate 2D drawings and wall lengths, or load sample room scan.
               </p>
             </div>
-          ) : (
-            <PointcloudViewer plyUrl={plyUrl} hasScan={false} />
           )
-        ) : activeTab === "floorplan" ? (
+        ) : activeTab === "pointcloud" ? (
+          <PointcloudViewer plyUrl={plyUrl} hasScan={true} />
+        ) : (
           <div className="relative w-full h-[400px] sm:h-[460px] rounded-xl border flex items-center justify-center p-4 overflow-hidden bg-[#181716]">
             {svgRaw ? (
               <div
@@ -228,8 +230,6 @@ export default function SpatialViewer({
               </div>
             )}
           </div>
-        ) : (
-          <PointcloudViewer plyUrl={plyUrl} hasScan={true} />
         )}
       </div>
 
