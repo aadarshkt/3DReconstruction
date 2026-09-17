@@ -1,13 +1,38 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import { useAuth } from "@/context/AuthContext";
 
 export default function ProfilePage() {
+  const { user: authUser, token, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !authUser && !token) {
+      router.replace("/login?redirect=/profile");
+    }
+  }, [loading, authUser, token, router]);
+
+  if (loading || (!authUser && !token)) {
+    return (
+      <div className="min-h-screen flex flex-col selection:bg-[var(--accent)] selection:text-white">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="flex flex-col items-center gap-3">
+            <span className="h-7 w-7 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
+            <p className="text-xs font-mono text-[var(--text-muted)]">Verifying session...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const user = {
-    name: "Aadarsh K.",
-    email: "aadarsh@example.com",
+    name: authUser?.full_name || authUser?.email?.split("@")[0] || "Aadarsh K.",
+    email: authUser?.email || "aadarsh@example.com",
     policyNumber: "HO3-8472910-CA",
     insurer: "State Farm Fire & Casualty",
     propertyAddress: "742 Evergreen Terrace, Springfield, OR",

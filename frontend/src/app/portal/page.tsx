@@ -1,13 +1,18 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import UploadSection from "@/components/UploadSection";
 import PolicySection from "@/components/PolicySection";
 import CostEstimateSection from "@/components/CostEstimateSection";
 import ChatAssistantSection from "@/components/ChatAssistantSection";
+import { useAuth } from "@/context/AuthContext";
 
 export default function UserPortalPage() {
+  const { user, token, loading, isAdmin } = useAuth();
+  const router = useRouter();
+
   const [activeTab, setActiveTab] = useState<"footage" | "policy" | "costs" | "assistant">("footage");
   const [jobId, setJobId] = useState<string | null>(null);
   const [claimId, setClaimId] = useState<string | null>(null);
@@ -17,6 +22,17 @@ export default function UserPortalPage() {
   const [policyDeductible, setPolicyDeductible] = useState<number>(1000);
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
+
+  // Client-side authentication guard
+  useEffect(() => {
+    if (!loading) {
+      if (!user && !token) {
+        router.replace("/login?redirect=/portal");
+      } else if (isAdmin) {
+        router.replace("/admin");
+      }
+    }
+  }, [loading, user, token, isAdmin, router]);
 
   // Check query parameters (e.g. ?tab=...)
   useEffect(() => {
@@ -50,6 +66,20 @@ export default function UserPortalPage() {
       setPolicyDeductible(analysis.deductible);
     }
   };
+
+  if (loading || (!user && !token) || isAdmin) {
+    return (
+      <div className="min-h-screen flex flex-col selection:bg-[var(--accent)] selection:text-white">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="flex flex-col items-center gap-3">
+            <span className="h-7 w-7 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
+            <p className="text-xs font-mono text-[var(--text-muted)]">Verifying session...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col selection:bg-[var(--accent)] selection:text-white">

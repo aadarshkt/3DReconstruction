@@ -19,8 +19,8 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   isUser: boolean;
-  loginWithGoogle: () => Promise<void>;
-  loginDev: (role: "admin" | "user", email?: string, name?: string) => Promise<void>;
+  loginWithGoogle: (redirectPath?: string) => Promise<void>;
+  loginDev: (role: "admin" | "user", email?: string, name?: string, redirectPath?: string) => Promise<void>;
   setSession: (token: string, user: UserProfile) => void;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -111,8 +111,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshUser]);
 
   // Initiate Google OAuth Flow
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (redirectPath?: string) => {
     try {
+      if (typeof window !== "undefined") {
+        if (redirectPath) {
+          sessionStorage.setItem("claimspace_auth_redirect", redirectPath);
+        } else {
+          sessionStorage.removeItem("claimspace_auth_redirect");
+        }
+      }
       const redirectUri = `${window.location.origin}/auth/callback`;
       const res = await fetch(`/api/v1/auth/google/url?redirect_uri=${encodeURIComponent(redirectUri)}`);
       const data = await res.json();
@@ -131,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Developer 1-Click login for testing roles
-  const loginDev = async (role: "admin" | "user", email?: string, name?: string) => {
+  const loginDev = async (role: "admin" | "user", email?: string, name?: string, redirectPath?: string) => {
     setLoading(true);
     try {
       const defaultEmail = role === "admin" ? "admin@claimspace.com" : "policyholder@example.com";
@@ -155,7 +162,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await res.json();
       setSession(data.access_token, data.user);
 
-      // Role-based redirection
+      // Role-based redirection with respect to redirectPath
+      if (redirectPath) {
+        if (data.user.role === "admin" && redirectPath.startsWith("/admin")) {
+          router.push(redirectPath);
+          return;
+        }
+        if (data.user.role === "user" && !redirectPath.startsWith("/admin")) {
+          router.push(redirectPath);
+          return;
+        }
+      }
+
       if (data.user.role === "admin") {
         router.push("/admin");
       } else {

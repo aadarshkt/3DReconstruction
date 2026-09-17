@@ -21,10 +21,25 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Protect User Portal routes: Admins are directed exclusively to the Admin Console
+  // Protect User Portal routes: Require authentication & exclude admins
   if (pathname.startsWith("/portal")) {
-    if (token && role === "admin") {
+    if (!token) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    // If authenticated as admin, redirect to Admin Console
+    if (role === "admin") {
       return NextResponse.redirect(new URL("/admin", request.url));
+    }
+  }
+
+  // Protect Profile route: Require authentication
+  if (pathname.startsWith("/profile")) {
+    if (!token) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(loginUrl);
     }
   }
 
@@ -32,5 +47,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/portal/:path*"],
+  matcher: ["/admin/:path*", "/portal/:path*", "/profile/:path*"],
 };

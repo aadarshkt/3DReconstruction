@@ -46,7 +46,21 @@ function CallbackContent() {
         setSession(data.access_token, data.user);
         setStatus("Authentication verified! Redirecting to your console...");
 
-        // Strict role-based navigation
+        // Strict role-based navigation with pending redirect check
+        const pendingRedirect = typeof window !== "undefined" ? sessionStorage.getItem("claimspace_auth_redirect") : null;
+        if (typeof window !== "undefined") sessionStorage.removeItem("claimspace_auth_redirect");
+
+        if (pendingRedirect) {
+          if (data.user.role === "admin" && pendingRedirect.startsWith("/admin")) {
+            router.replace(pendingRedirect);
+            return;
+          }
+          if (data.user.role === "user" && !pendingRedirect.startsWith("/admin")) {
+            router.replace(pendingRedirect);
+            return;
+          }
+        }
+
         if (data.user.role === "admin") {
           router.replace("/admin");
         } else {

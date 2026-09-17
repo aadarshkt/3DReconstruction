@@ -70,23 +70,11 @@ export default function LandingPage() {
                 Launch User Console
               </Link>
 
-              <a
-                href="#interactive-preview"
-                className="btn-squish w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border px-6 py-3.5 text-sm font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all text-center"
-                style={{
-                  backgroundColor: "var(--bg-card)",
-                  borderColor: "var(--border-default)",
-                }}
-              >
-                <span>Try Live Demo</span>
-                <span className="text-xs text-[var(--accent)]">↓</span>
-              </a>
-
               <Link
                 href="/tour"
-                className="btn-squish w-full sm:w-auto inline-flex items-center justify-center rounded-xl border px-6 py-3.5 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all text-center"
+                className="btn-squish w-full sm:w-auto inline-flex items-center justify-center rounded-xl border px-6 py-3.5 text-sm font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all text-center"
                 style={{
-                  backgroundColor: "var(--bg-surface)",
+                  backgroundColor: "var(--bg-card)",
                   borderColor: "var(--border-default)",
                 }}
               >
@@ -317,13 +305,13 @@ export default function LandingPage() {
                   </p>
                 </div>
                 <Link
-                  href="/portal"
+                  href="/tour"
                   className="btn-squish inline-flex items-center justify-center rounded-xl px-5 py-3 text-xs font-semibold text-white shadow-sm transition-all"
                   style={{
                     backgroundColor: "var(--accent)",
                   }}
                 >
-                  Enter User Workspace →
+                  Start Guided Tour →
                 </Link>
               </div>
             </div>
@@ -355,6 +343,7 @@ export default function LandingPage() {
 
           <div className="flex items-center gap-6 text-xs text-[var(--text-secondary)]">
             <Link href="/" className="hover:text-[var(--text-primary)] transition-colors">Overview</Link>
+            <Link href="/tour" className="hover:text-[var(--text-primary)] transition-colors">Guided Tour</Link>
             <Link href="/portal" className="hover:text-[var(--text-primary)] transition-colors">User Portal</Link>
             <Link href="/login" className="hover:text-[var(--text-primary)] transition-colors">Sign In</Link>
             <Link href="/profile" className="hover:text-[var(--text-primary)] transition-colors">Profile</Link>
