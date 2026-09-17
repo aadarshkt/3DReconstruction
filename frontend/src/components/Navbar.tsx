@@ -101,19 +101,34 @@ export default function Navbar({ onStartTour }: NavbarProps) {
 
         {/* Right Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Guided Tour Link (Only for visitors and users, not admin clutter) */}
+          {/* Guided Tour Link / Action: When on /tour, renders the single Start Guided Tour button at the top */}
           {!isAdmin && (
-            <Link
-              href="/tour"
-              className="btn-squish hidden sm:inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
-              style={{
-                backgroundColor: pathname === "/tour" ? "var(--bg-surface)" : "var(--bg-card)",
-                borderColor: pathname === "/tour" ? "var(--accent)" : "var(--border-default)",
-              }}
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-pulse"></span>
-              Guided Tour
-            </Link>
+            pathname === "/tour" ? (
+              <button
+                type="button"
+                id="tour-start-btn"
+                onClick={onStartTour}
+                className="btn-squish inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-all"
+                style={{
+                  backgroundColor: "var(--accent)",
+                }}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                <span>Start Guided Tour</span>
+              </button>
+            ) : (
+              <Link
+                href="/tour"
+                className="btn-squish hidden sm:inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
+                style={{
+                  backgroundColor: "var(--bg-card)",
+                  borderColor: "var(--border-default)",
+                }}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-pulse"></span>
+                Start Guided Tour
+              </Link>
+            )
           )}
 
           {/* Theme Switcher Toggle */}
@@ -318,18 +333,35 @@ export default function Navbar({ onStartTour }: NavbarProps) {
           {/* Quick Actions Strip */}
           <div className="pt-2 border-t flex flex-col gap-2" style={{ borderColor: "var(--border-subtle)" }}>
             {!isAdmin && (
-              <Link
-                href="/tour"
-                onClick={handleNavClick}
-                className="btn-squish w-full flex items-center justify-center gap-2 rounded-lg border py-2.5 text-xs font-medium text-[var(--text-primary)]"
-                style={{
-                  backgroundColor: pathname === "/tour" ? "var(--bg-surface)" : "var(--bg-card)",
-                  borderColor: pathname === "/tour" ? "var(--accent)" : "var(--border-default)",
-                }}
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-pulse"></span>
-                Guided Tour
-              </Link>
+              pathname === "/tour" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleNavClick();
+                    if (onStartTour) onStartTour();
+                  }}
+                  className="btn-squish w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-semibold text-white transition-all"
+                  style={{
+                    backgroundColor: "var(--accent)",
+                  }}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                  <span>Start Guided Tour</span>
+                </button>
+              ) : (
+                <Link
+                  href="/tour"
+                  onClick={handleNavClick}
+                  className="btn-squish w-full flex items-center justify-center gap-2 rounded-lg border py-2.5 text-xs font-medium text-[var(--text-primary)]"
+                  style={{
+                    backgroundColor: "var(--bg-card)",
+                    borderColor: "var(--border-default)",
+                  }}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-pulse"></span>
+                  Start Guided Tour
+                </Link>
+              )
             )}
 
             {user ? (

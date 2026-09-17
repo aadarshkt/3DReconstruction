@@ -198,7 +198,7 @@ export default function GuidedTourPage() {
 
   return (
     <div className="min-h-screen flex flex-col selection:bg-[var(--accent)] selection:text-white">
-      <Navbar />
+      <Navbar onStartTour={startTour} />
 
       <main className="flex-1 py-6 sm:py-8 px-3 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl space-y-6 sm:space-y-8">
@@ -240,18 +240,6 @@ export default function GuidedTourPage() {
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
                 {isLoading ? "Loading..." : "Load Sample Dataset"}
-              </button>
-
-              <button
-                id="tour-start-btn"
-                onClick={startTour}
-                className="btn-squish flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-all"
-                style={{
-                  backgroundColor: "var(--accent)",
-                }}
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-                <span>Start Guided Tour</span>
               </button>
             </div>
           </div>

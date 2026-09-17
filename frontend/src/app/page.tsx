@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import WalkthroughModal from "@/components/WalkthroughModal";
+import ConsolePreview from "@/components/ConsolePreview";
 
 export default function LandingPage() {
   const [isTourOpen, setIsTourOpen] = useState(false);
@@ -69,22 +70,34 @@ export default function LandingPage() {
                 Launch User Console
               </Link>
 
-              <Link
-                href="/tour"
-                className="btn-squish w-full sm:w-auto inline-flex items-center justify-center rounded-xl border px-6 py-3.5 text-sm font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all text-center"
+              <a
+                href="#interactive-preview"
+                className="btn-squish w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border px-6 py-3.5 text-sm font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all text-center"
                 style={{
                   backgroundColor: "var(--bg-card)",
                   borderColor: "var(--border-default)",
                 }}
               >
-                Take Guided Tour
+                <span>Try Live Demo</span>
+                <span className="text-xs text-[var(--accent)]">↓</span>
+              </a>
+
+              <Link
+                href="/tour"
+                className="btn-squish w-full sm:w-auto inline-flex items-center justify-center rounded-xl border px-6 py-3.5 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all text-center"
+                style={{
+                  backgroundColor: "var(--bg-surface)",
+                  borderColor: "var(--border-default)",
+                }}
+              >
+                Start Guided Tour
               </Link>
             </div>
 
             {/* Trust / Metric Strip */}
             <div className="pt-6 sm:pt-8 border-t max-w-3xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 text-center" style={{ borderColor: "var(--border-subtle)" }}>
               <div className="p-2">
-                <div className="font-serif text-xl sm:text-2xl font-semibold text-[var(--text-primary)]">±2.5 cm</div>
+                <div className="font-serif text-xl sm:text-2xl font-semibold text-[var(--text-primary)]">±0.8 cm</div>
                 <div className="text-[10px] sm:text-[11px] text-[var(--text-muted)] uppercase tracking-wider font-mono mt-0.5">LiDAR Precision</div>
               </div>
               <div className="p-2">
@@ -100,6 +113,33 @@ export default function LandingPage() {
                 <div className="text-[10px] sm:text-[11px] text-[var(--text-muted)] uppercase tracking-wider font-mono mt-0.5">Claim Intelligence</div>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Live Interactive User Console Sandbox Preview */}
+        <section
+          id="interactive-preview"
+          className="px-4 sm:px-6 lg:px-8 py-12 sm:py-16 border-t scroll-mt-6"
+          style={{
+            borderColor: "var(--border-subtle)",
+            backgroundColor: "var(--bg-page)",
+          }}
+        >
+          <div className="mx-auto max-w-6xl space-y-8">
+            <div className="text-center max-w-3xl mx-auto space-y-3">
+              <span className="text-xs font-mono uppercase tracking-widest text-[var(--accent)] font-semibold">
+                Interactive Product Playground
+              </span>
+              <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-medium tracking-tight text-[var(--text-primary)]">
+                Experience the Platform in Action
+              </h2>
+              <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed max-w-2xl mx-auto">
+                Test the actual user console below: drag and orbit the real-time 3D point cloud, chat with the AI claims assistant, and inspect verified policy coverage and calculated payouts.
+              </p>
+            </div>
+
+            {/* Embedded Live Console Component */}
+            <ConsolePreview />
           </div>
         </section>
 
