@@ -96,18 +96,86 @@ export default function Navbar({ onStartTour }: NavbarProps) {
             Guided Tour
           </Link>
 
-          {/* Theme Switcher Button */}
+          {/* Theme Switcher Toggle */}
           <button
+            type="button"
+            role="switch"
+            aria-checked={theme === "dark"}
+            aria-label={theme === "light" ? "Switch to dark theme" : "Switch to light theme"}
+            title={theme === "light" ? "Switch to dark theme" : "Switch to light theme"}
             onClick={toggleTheme}
-            aria-label="Toggle theme"
-            className="btn-squish flex items-center justify-center rounded-md border px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-colors"
+            className="btn-squish relative inline-flex h-7 w-[54px] shrink-0 cursor-pointer items-center rounded-full border p-0.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] hover:border-[var(--border-strong)]"
             style={{
               backgroundColor: "var(--bg-surface)",
-              borderColor: "var(--border-subtle)",
+              borderColor: "var(--border-default)",
             }}
           >
-            <span className="text-[11px] font-mono uppercase tracking-wider">
-              {theme === "light" ? "Light" : "Dark"}
+            {/* Background track icons */}
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-between px-1.5">
+              {/* Sun icon on left track */}
+              <svg
+                className={`h-3.5 w-3.5 transition-opacity duration-200 ${
+                  theme === "light" ? "opacity-0" : "text-[var(--text-muted)] opacity-60"
+                }`}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+              </svg>
+
+              {/* Moon icon on right track */}
+              <svg
+                className={`h-3 w-3 transition-opacity duration-200 ${
+                  theme === "dark" ? "opacity-0" : "text-[var(--text-muted)] opacity-60"
+                }`}
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+              </svg>
+            </span>
+
+            {/* Sliding Thumb Knob */}
+            <span
+              className={`pointer-events-none flex h-[22px] w-[22px] transform items-center justify-center rounded-full shadow-sm border transition-transform duration-200 ease-in-out ${
+                theme === "dark" ? "translate-x-[26px]" : "translate-x-0"
+              }`}
+              style={{
+                backgroundColor: "var(--bg-card)",
+                borderColor: "var(--border-default)",
+              }}
+            >
+              {theme === "light" ? (
+                <svg
+                  className="h-3.5 w-3.5 text-amber-500"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+                </svg>
+              ) : (
+                <svg
+                  className="h-3 w-3 text-amber-300"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                </svg>
+              )}
             </span>
           </button>
 
