@@ -16,7 +16,7 @@ export default function Navbar({ onStartTour }: NavbarProps) {
 
   const navLinks = [
     { label: "Overview", href: "/" },
-    { label: "User Portal", href: "/portal" },
+    { label: "User Console", href: "/portal" },
     { label: "Profile", href: "/profile" },
     { label: "Admin Console", href: "/admin" },
   ];
@@ -83,20 +83,18 @@ export default function Navbar({ onStartTour }: NavbarProps) {
 
         {/* Right Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Guided Walkthrough Button (Desktop/Tablet) */}
-          {onStartTour && (
-            <button
-              onClick={onStartTour}
-              className="btn-squish hidden sm:inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
-              style={{
-                backgroundColor: "var(--bg-card)",
-                borderColor: "var(--border-default)",
-              }}
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-pulse"></span>
-              Guided Tour
-            </button>
-          )}
+          {/* Guided Tour Link (Desktop/Tablet) */}
+          <Link
+            href="/tour"
+            className="btn-squish hidden sm:inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
+            style={{
+              backgroundColor: pathname === "/tour" ? "var(--bg-surface)" : "var(--bg-card)",
+              borderColor: pathname === "/tour" ? "var(--accent)" : "var(--border-default)",
+            }}
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-pulse"></span>
+            Guided Tour
+          </Link>
 
           {/* Theme Switcher Button */}
           <button
@@ -187,22 +185,18 @@ export default function Navbar({ onStartTour }: NavbarProps) {
 
           {/* Quick Actions Strip */}
           <div className="pt-2 border-t flex flex-col gap-2" style={{ borderColor: "var(--border-subtle)" }}>
-            {onStartTour && (
-              <button
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  onStartTour();
-                }}
-                className="btn-squish w-full flex items-center justify-center gap-2 rounded-lg border py-2.5 text-xs font-medium text-[var(--text-primary)]"
-                style={{
-                  backgroundColor: "var(--bg-surface)",
-                  borderColor: "var(--border-default)",
-                }}
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-pulse"></span>
-                Launch Guided Walkthrough
-              </button>
-            )}
+            <Link
+              href="/tour"
+              onClick={handleNavClick}
+              className="btn-squish w-full flex items-center justify-center gap-2 rounded-lg border py-2.5 text-xs font-medium text-[var(--text-primary)]"
+              style={{
+                backgroundColor: pathname === "/tour" ? "var(--bg-surface)" : "var(--bg-card)",
+                borderColor: pathname === "/tour" ? "var(--accent)" : "var(--border-default)",
+              }}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-pulse"></span>
+              Guided Tour
+            </Link>
 
             <Link
               href="/login"

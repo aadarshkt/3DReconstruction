@@ -66,11 +66,11 @@ export default function LandingPage() {
                   backgroundColor: "var(--accent)",
                 }}
               >
-                Launch User Portal
+                Launch User Console
               </Link>
 
-              <button
-                onClick={() => setIsTourOpen(true)}
+              <Link
+                href="/tour"
                 className="btn-squish w-full sm:w-auto inline-flex items-center justify-center rounded-xl border px-6 py-3.5 text-sm font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all text-center"
                 style={{
                   backgroundColor: "var(--bg-card)",
@@ -78,7 +78,7 @@ export default function LandingPage() {
                 }}
               >
                 Take Guided Tour
-              </button>
+              </Link>
             </div>
 
             {/* Trust / Metric Strip */}

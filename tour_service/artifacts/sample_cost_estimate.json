@@ -1,0 +1,68 @@
+{
+  "room_area_m2": 24.5,
+  "damage_area_m2": 18.2,
+  "line_items": [
+    {
+      "code": "WTR-EXT",
+      "category": "Water Mitigation",
+      "description": "Emergency standing water extraction from subfloor & tile",
+      "quantity": 18.2,
+      "unit": "m²",
+      "unit_price": 28.50,
+      "subtotal": 518.70
+    },
+    {
+      "code": "DRY-TEAR",
+      "category": "Demolition",
+      "description": "Tear out & bag saturated 1/2\" drywall 2ft flood cut",
+      "quantity": 14.4,
+      "unit": "m²",
+      "unit_price": 42.00,
+      "subtotal": 604.80
+    },
+    {
+      "code": "DRY-INST",
+      "category": "Reconstruction",
+      "description": "Hang, tape, float & sand water-resistant mold-tough drywall",
+      "quantity": 14.4,
+      "unit": "m²",
+      "unit_price": 68.00,
+      "subtotal": 979.20
+    },
+    {
+      "code": "FLR-SUB",
+      "category": "Flooring",
+      "description": "Antimicrobial treatment & commercial dehumidification setup (3 days)",
+      "quantity": 3.0,
+      "unit": "days",
+      "unit_price": 210.00,
+      "subtotal": 630.00
+    },
+    {
+      "code": "FLR-INST",
+      "category": "Flooring",
+      "description": "Engineered hardwood underlayment & plank replacement in kitchen area",
+      "quantity": 18.2,
+      "unit": "m²",
+      "unit_price": 75.00,
+      "subtotal": 1365.00
+    },
+    {
+      "code": "PNT-PRM",
+      "category": "Finishing",
+      "description": "Stain-blocking primer coat & 2 finish coats architectural enamel",
+      "quantity": 28.8,
+      "unit": "m²",
+      "unit_price": 18.75,
+      "subtotal": 540.00
+    }
+  ],
+  "subtotal": 4637.70,
+  "overhead_and_profit_pct": 10.0,
+  "overhead_and_profit_amount": 463.77,
+  "gross_claim_amount": 5101.47,
+  "deductible": 1000.00,
+  "net_claim_payout": 4101.47,
+  "currency": "USD",
+  "pricing_standard": "Xactimate Regional Matrix 2025.Q1"
+}

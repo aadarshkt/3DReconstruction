@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
-import WalkthroughModal from "@/components/WalkthroughModal";
 import UploadSection from "@/components/UploadSection";
 import PolicySection from "@/components/PolicySection";
 import CostEstimateSection from "@/components/CostEstimateSection";
@@ -10,7 +9,6 @@ import ChatAssistantSection from "@/components/ChatAssistantSection";
 
 export default function UserPortalPage() {
   const [activeTab, setActiveTab] = useState<"footage" | "policy" | "costs" | "assistant">("footage");
-  const [isTourOpen, setIsTourOpen] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [claimId, setClaimId] = useState<string | null>(null);
   const [jobData, setJobData] = useState<any | null>(null);
@@ -20,13 +18,10 @@ export default function UserPortalPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
 
-  // Check query parameters (e.g. ?tour=true or ?tab=...)
+  // Check query parameters (e.g. ?tab=...)
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      if (params.get("tour") === "true") {
-        setIsTourOpen(true);
-      }
       const qTab = params.get("tab");
       if (qTab && ["footage", "policy", "costs", "assistant"].includes(qTab)) {
         setActiveTab(qTab as any);
@@ -50,23 +45,6 @@ export default function UserPortalPage() {
     setStatusMessage("");
   };
 
-  const handleLoadSample = async () => {
-    setIsLoading(true);
-    setStatusMessage("Loading verified sample 3D scan and policy...");
-    try {
-      const res = await fetch("/claims/seed-demo", { method: "POST" });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      handleJobLoaded(data, true);
-      setStatusMessage("Sample claim and 3D scan loaded.");
-    } catch (_) {
-      handleJobLoaded({ job_id: "demo-job", areaM2: 24.5, wallsCount: 4 }, true);
-      setStatusMessage("Sample dataset loaded.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handlePolicyAnalyzed = (analysis: any) => {
     if (analysis && analysis.deductible != null) {
       setPolicyDeductible(analysis.deductible);
@@ -75,18 +53,7 @@ export default function UserPortalPage() {
 
   return (
     <div className="min-h-screen flex flex-col selection:bg-[var(--accent)] selection:text-white">
-      <Navbar onStartTour={() => setIsTourOpen(true)} />
-
-      {/* Guided Walkthrough Modal */}
-      <WalkthroughModal
-        isOpen={isTourOpen}
-        onClose={() => setIsTourOpen(false)}
-        onNavigateTab={(tabKey) => {
-          if (["footage", "policy", "costs", "assistant"].includes(tabKey)) {
-            setActiveTab(tabKey as any);
-          }
-        }}
-      />
+      <Navbar />
 
       <main className="flex-1 py-6 sm:py-8 px-3 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl space-y-6 sm:space-y-8">
@@ -95,7 +62,7 @@ export default function UserPortalPage() {
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[11px] font-mono uppercase tracking-widest text-[var(--accent)] font-semibold">
-                  User Workspace
+                  User Console
                 </span>
                 {/* Minimalist status badge */}
                 {isDemoMode ? (
@@ -125,34 +92,6 @@ export default function UserPortalPage() {
               <p className="text-xs text-[var(--text-secondary)]">
                 Capture room dimensions, verify policy coverage, and calculate repair costs in minutes.
               </p>
-            </div>
-
-            <div className="flex flex-col xs:flex-row sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-              {!isDemoMode && !jobId && (
-                <button
-                  onClick={handleLoadSample}
-                  disabled={isLoading}
-                  className="btn-squish flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
-                  style={{
-                    backgroundColor: "var(--bg-surface)",
-                    borderColor: "var(--border-default)",
-                  }}
-                >
-                  Load Sample Dataset
-                </button>
-              )}
-
-              <button
-                onClick={() => setIsTourOpen(true)}
-                className="btn-squish flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-lg border px-3.5 py-2 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
-                style={{
-                  backgroundColor: "var(--bg-card)",
-                  borderColor: "var(--border-default)",
-                }}
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
-                <span className="sm:inline">Guided Walkthrough</span>
-              </button>
             </div>
           </div>
 

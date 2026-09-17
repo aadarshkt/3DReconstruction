@@ -32,6 +32,7 @@ interface UploadSectionProps {
   isDemo?: boolean;
   jobData?: any | null;
   onNavigateTab?: (tab: "footage" | "policy" | "costs" | "assistant") => void;
+  allowSample?: boolean;
 }
 
 export default function UploadSection({
@@ -46,6 +47,7 @@ export default function UploadSection({
   isDemo = false,
   jobData = null,
   onNavigateTab,
+  allowSample = false,
 }: UploadSectionProps) {
   const [activeMediaTab, setActiveMediaTab] = useState<"photos" | "video" | "lidar">("photos");
   const [dragOver, setDragOver] = useState(false);
@@ -310,19 +312,21 @@ export default function UploadSection({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <button
-            onClick={handleSeedDemo}
-            disabled={isLoading || isProcessing}
-            className="btn-squish w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
-            style={{
-              backgroundColor: "var(--bg-surface)",
-              borderColor: "var(--border-default)",
-            }}
-          >
-            Load Sample 3D Scan
-          </button>
-        </div>
+        {allowSample && (
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={handleSeedDemo}
+              disabled={isLoading || isProcessing}
+              className="btn-squish w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
+              style={{
+                backgroundColor: "var(--bg-surface)",
+                borderColor: "var(--border-default)",
+              }}
+            >
+              Load Sample 3D Scan
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Progress & Next Step Guidance Prompt */}

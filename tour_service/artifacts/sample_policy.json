@@ -1,0 +1,30 @@
+{
+  "policy_form": "ISO HO-3 Standard Homeowners",
+  "policy_number": "HO3-8829104-NY",
+  "insurer": "Travelers Insurance / Standard Mutual",
+  "effective_dates": "2025-01-01 to 2026-01-01",
+  "coverage_status": "covered",
+  "peril": "Accidental Discharge or Overflow of Water or Steam",
+  "peril_number": 12,
+  "peril_description": "Sudden burst of pressurized copper supply line under kitchen sink causing localized flooding and subfloor saturation.",
+  "deductible": 1000.0,
+  "coverage_limit": 350000.0,
+  "cited_clauses": [
+    {
+      "section": "SECTION I - PROPERTY COVERAGES, COVERAGE A - DWELLING",
+      "clause_text": "We cover the dwelling on the 'residence premises' shown in the Declarations, including structures attached to the dwelling.",
+      "page": 4
+    },
+    {
+      "section": "SECTION I - PERILS INSURED AGAINST",
+      "clause_text": "12. Accidental Discharge Or Overflow Of Water Or Steam from within a plumbing, heating, air conditioning or automatic fire protective sprinkler system or household appliance on the 'residence premises'.",
+      "page": 9
+    },
+    {
+      "section": "SECTION I - EXCLUSIONS",
+      "clause_text": "Constant or repeated seepage or leakage of water or steam over a period of weeks, months, or years is excluded. (Adjuster note: Damage is acute/sudden, verified with moisture mapping; exclusion does not apply).",
+      "page": 12
+    }
+  ],
+  "adjuster_notes": "Claim qualifies for immediate expedited remediation authorization under Coverage A. Recommend moisture mitigation and drying within 48 hours."
+}

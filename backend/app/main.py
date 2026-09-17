@@ -84,6 +84,18 @@ app.include_router(results_router.router, prefix="/jobs",    tags=["Results"])
 app.include_router(claims_router.router,  prefix="/api/v1/claims", tags=["Claims"])
 app.include_router(claims_router.router,  prefix="/claims",        tags=["Claims"])
 
+# ── Guided Tour Microservice Router (can be run standalone or unified) ──────
+try:
+    import sys
+    _root_dir = str(Path(__file__).resolve().parent.parent.parent)
+    if _root_dir not in sys.path:
+        sys.path.insert(0, _root_dir)
+    from tour_service.router import router as tour_router
+    app.include_router(tour_router, prefix="/api/v1/tour", tags=["Guided Tour"])
+    app.include_router(tour_router, prefix="/tour",        tags=["Guided Tour"])
+except Exception as e:
+    log.warning("tour_router_mount_failed", error=str(e))
+
 
 # ── Dashboard & Static files ──────────────────────────────────────────────────
 dashboard_dir = Path("/app/web_dashboard")

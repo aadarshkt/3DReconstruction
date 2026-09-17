@@ -23,6 +23,7 @@ interface PolicySectionProps {
   statusMessage: string;
   setStatusMessage: (msg: string) => void;
   isDemo?: boolean;
+  allowSample?: boolean;
 }
 
 export default function PolicySection({
@@ -33,6 +34,7 @@ export default function PolicySection({
   statusMessage,
   setStatusMessage,
   isDemo = false,
+  allowSample = false,
 }: PolicySectionProps) {
   const [policyUploaded, setPolicyUploaded] = useState(false);
   const [analysis, setAnalysis] = useState<PolicyAnalysis | null>(null);
@@ -172,17 +174,19 @@ export default function PolicySection({
           </p>
         </div>
 
-        <button
-          onClick={handleLoadSamplePolicy}
-          disabled={isLoading}
-          className="btn-squish w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
-          style={{
-            backgroundColor: "var(--bg-card)",
-            borderColor: "var(--border-default)",
-          }}
-        >
-          Attach Sample ISO HO-3 Policy
-        </button>
+        {allowSample && (
+          <button
+            onClick={handleLoadSamplePolicy}
+            disabled={isLoading}
+            className="btn-squish w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-[var(--text-primary)] shadow-sm hover:border-[var(--border-strong)] transition-all"
+            style={{
+              backgroundColor: "var(--bg-card)",
+              borderColor: "var(--border-default)",
+            }}
+          >
+            Attach Sample ISO HO-3 Policy
+          </button>
+        )}
       </div>
 
       {/* Loss & Claim Parameters */}

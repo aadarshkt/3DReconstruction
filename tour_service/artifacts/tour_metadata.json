@@ -1,0 +1,56 @@
+{
+  "job_id": "tour-demo-spatial-roomplan-24m2",
+  "claim_id": "tour-demo-claim-water-ho3",
+  "room_name": "Kitchen & Living Room Suite",
+  "room_area_m2": 24.5,
+  "wall_count": 4,
+  "damage_area_m2": 18.2,
+  "scale_confidence": "native_metric",
+  "tier": "roomplan",
+  "walls": [
+    {
+      "id": 1,
+      "name": "Wall 1 (North)",
+      "length_m": 5.40,
+      "start": [0.0, 0.0],
+      "end": [5.4, 0.0],
+      "has_opening": false,
+      "opening_type": null
+    },
+    {
+      "id": 2,
+      "name": "Wall 2 (East)",
+      "length_m": 4.50,
+      "start": [5.4, 0.0],
+      "end": [5.4, 4.5],
+      "has_opening": true,
+      "opening_type": "door"
+    },
+    {
+      "id": 3,
+      "name": "Wall 3 (South)",
+      "length_m": 5.40,
+      "start": [5.4, 4.5],
+      "end": [0.0, 4.5],
+      "has_opening": true,
+      "opening_type": "window"
+    },
+    {
+      "id": 4,
+      "name": "Wall 4 (West)",
+      "length_m": 4.50,
+      "start": [0.0, 4.5],
+      "end": [0.0, 0.0],
+      "has_opening": false,
+      "opening_type": null
+    }
+  ],
+  "error_estimate": {
+    "method": "LiDAR native mesh validation",
+    "expected_wall_error_cm": 0.8
+  },
+  "artifacts": {
+    "floor_plan_svg": "/api/v1/tour/artifacts/floor_plan.svg",
+    "point_cloud_ply": "/api/v1/tour/artifacts/point_cloud.ply"
+  }
+}
