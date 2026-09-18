@@ -5,17 +5,23 @@ from urllib.parse import urlencode
 
 import httpx
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
-from app.core.database import get_db
-from app.core.security import create_access_token, get_current_user
-from app.models.user import User, UserRole
+try:
+    from auth_service.config import settings
+    from auth_service.database import get_db
+    from auth_service.models import User, UserRole
+    from auth_service.security import create_access_token, decode_access_token, get_current_user
+except ImportError:
+    from config import settings
+    from database import get_db
+    from models import User, UserRole
+    from security import create_access_token, decode_access_token, get_current_user
 
-router = APIRouter(prefix="/auth", tags=["authentication"])
+router = APIRouter(tags=["Authentication"])
 log = structlog.get_logger()
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -38,6 +44,15 @@ class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: dict
+
+
+@router.get("/health")
+async def health():
+    return {
+        "status": "ok",
+        "service": "claimspace-auth-microservice",
+        "version": settings.SERVICE_VERSION,
+    }
 
 
 @router.get("/google/url")
@@ -143,7 +158,6 @@ async def google_auth_callback(
         if google_sub:
             user.oauth_sub = google_sub
     else:
-        # Determine initial role: Check if matches INITIAL_ADMIN_EMAIL
         role = (
             UserRole.ADMIN
             if settings.INITIAL_ADMIN_EMAIL
@@ -179,7 +193,7 @@ async def google_auth_callback(
         value=jwt_token,
         httponly=True,
         samesite="lax",
-        secure=False,  # True in HTTPS production
+        secure=False,
         max_age=60 * 60 * 24 * 7,
     )
 
@@ -198,7 +212,7 @@ async def dev_login(
 ):
     """
     Developer login endpoint for local testing without requiring immediate Google Cloud setup.
-    Disabled automatically in production.
+    Disabled automatically in production when ALLOW_DEV_LOGIN is False.
     """
     if not settings.ALLOW_DEV_LOGIN:
         raise HTTPException(
@@ -278,3 +292,18 @@ async def logout(response: Response):
     """
     response.delete_cookie(key="auth_token")
     return {"status": "success", "message": "Successfully logged out"}
+
+
+@router.get("/verify")
+async def verify_token(request: Request, current_user: User = Depends(get_current_user)):
+    """
+    Inter-service token verification and introspection endpoint.
+    Allows other services or API gateways to validate tokens against auth_service.
+    """
+    return {
+        "valid": True,
+        "user_id": current_user.id,
+        "email": current_user.email,
+        "role": current_user.role.value if isinstance(current_user.role, UserRole) else str(current_user.role),
+        "is_active": current_user.is_active,
+    }

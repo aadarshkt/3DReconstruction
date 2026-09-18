@@ -1,35 +1,22 @@
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Union
 
 import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
-from app.models.user import UserRole
+try:
+    from auth_service.config import settings
+    from auth_service.database import get_db
+    from auth_service.models import User, UserRole
+except ImportError:
+    from config import settings
+    from database import get_db
+    from models import User, UserRole
 
 security_scheme = HTTPBearer(auto_error=False)
-
-
-@dataclass
-class AuthenticatedUser:
-    """
-    Stateless authenticated user identity decoded directly from JWT claims.
-    Decouples backend endpoints from requiring a direct database hit on every request.
-    """
-    id: str
-    email: str
-    role: Union[UserRole, str]
-    is_active: bool = True
-
-    def to_dict(self) -> dict:
-        return {
-            "id": self.id,
-            "email": self.email,
-            "role": self.role.value if isinstance(self.role, UserRole) else str(self.role),
-            "is_active": self.is_active,
-        }
 
 
 def create_access_token(
@@ -86,10 +73,8 @@ def decode_access_token(token: str) -> dict:
 async def get_current_user(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
-) -> AuthenticatedUser:
-    """
-    Validates the bearer token or cookie statelessly without querying the database.
-    """
+    db: AsyncSession = Depends(get_db),
+) -> User:
     token: Optional[str] = None
 
     # 1. Try Bearer header
@@ -108,9 +93,6 @@ async def get_current_user(
 
     payload = decode_access_token(token)
     user_id: str = payload.get("sub")
-    email: str = payload.get("email", "")
-    role_str: str = payload.get("role", "user")
-
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -118,24 +100,23 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    role = UserRole.ADMIN if role_str.lower() == "admin" else UserRole.USER
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
 
-    return AuthenticatedUser(
-        id=user_id,
-        email=email,
-        role=role,
-        is_active=True,
-    )
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is deactivated",
+        )
 
-async def get_optional_user(
-    request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
-) -> Optional[AuthenticatedUser]:
-    try:
-        return await get_current_user(request, credentials)
-    except HTTPException:
-        return None
+    return user
 
 
 def require_role(allowed_roles: List[Union[UserRole, str]]):
@@ -144,8 +125,8 @@ def require_role(allowed_roles: List[Union[UserRole, str]]):
     ]
 
     async def role_checker(
-        current_user: AuthenticatedUser = Depends(get_current_user),
-    ) -> AuthenticatedUser:
+        current_user: User = Depends(get_current_user),
+    ) -> User:
         user_role = (
             current_user.role.value
             if isinstance(current_user.role, UserRole)
@@ -161,6 +142,5 @@ def require_role(allowed_roles: List[Union[UserRole, str]]):
     return role_checker
 
 
-# Convenient role dependencies
 require_admin = require_role([UserRole.ADMIN])
 require_user = require_role([UserRole.USER, UserRole.ADMIN])

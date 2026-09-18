@@ -150,3 +150,20 @@ extracted_frames
 gerrard-hall
 graham-hall.z05
 office
+client_secret*.json
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+
+# Terraform
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+.terraform/
+.terraform.lock.hcl

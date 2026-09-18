@@ -26,7 +26,6 @@ from app.api import jobs as jobs_router
 from app.api import uploads as uploads_router
 from app.api import results as results_router
 from app.api import claims as claims_router
-from app.api import auth as auth_router
 
 log = structlog.get_logger()
 
@@ -71,8 +70,6 @@ app.add_middleware(
 )
 
 # ── API routers ────────────────────────────────────────────────────────────────
-app.include_router(auth_router.router,    prefix="/api/v1")
-app.include_router(auth_router.router,    prefix="")
 app.include_router(jobs_router.router,    prefix="/jobs",    tags=["Jobs"])
 app.include_router(uploads_router.router, prefix="/jobs",    tags=["Uploads"])
 app.include_router(results_router.router, prefix="/jobs",    tags=["Results"])

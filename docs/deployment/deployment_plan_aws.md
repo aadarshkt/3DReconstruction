@@ -1,56 +1,58 @@
 # AWS Containerized Deployment Plan: 3D Reconstruction & Floor Plan System
 
-## 1. Architecture Overview & Workload Analysis
+## 1. Architecture Overview & Microservice Workload Analysis
 
-This repository contains a multi-tier spatial computing and 3D reconstruction system:
-1. **FastAPI Backend (`api`)**: REST API for job dispatch, RoomPlan/LiDAR ingestion, LLM claim orchestration, and static viewer hosting.
-2. **Celery Worker (`worker`)**: Heavy CPU/GPU compute running:
-   - **COLMAP**: Structure-from-Motion (feature extraction, matcher, bundle adjustment) + Dense MVS (`patch_match_stereo`, stereo fusion).
+This repository is architected as a modular, decoupled spatial computing and 3D reconstruction system composed of independent microservices:
+
+1. **Next.js Frontend (`frontend` - Port 3000)**: React 19 + Three.js 3D viewer canvas, responsive layout, tour walkthrough engine, and client-side Google OAuth handshakes.
+2. **Auth Microservice (`auth_service` - Port 8002)**: Dedicated, ultra-lightweight identity service for Google OAuth 2.0 / OIDC, JWT issuing/verification (`HS256`), and PostgreSQL `users` table management. Completely isolated from heavy compute.
+3. **Guided Tour Microservice (`tour_service` - Port 8001)**: Fully self-contained demo microservice serving static 3D point clouds (`.ply`), dimensioned floor plans (`.svg`), sample ISO HO-3 insurance policies, and deterministic tour chat with sub-10ms latency and zero database dependencies.
+4. **Main Backend Service (`backend` - Port 8000)**: Heavy REST API for real job dispatch, LiDAR/RoomPlan coordinate ingestion, LLM insurance claim orchestration, and Celery task enqueueing. (Dormant during lightweight tour deployments).
+5. **Celery GPU Worker (`worker`)**: Asynchronous compute running on-demand:
+   - **COLMAP**: Structure-from-Motion (SfM) + CUDA dense MVS (`patch_match_stereo`, stereo fusion).
    - **Open3D / RANSAC**: Point cloud cleaning, plane segmentation, wall projection, 2D vector generation.
    - **ReportLab**: PDF report and insurance claim analysis.
-3. **Database**: PostgreSQL (SQLAlchemy async/sync models for jobs, rooms, measurements, claims).
-4. **Broker / Queue**: Redis (Celery broker and task result backend).
-5. **Frontend**: Next.js 16 (React 19 + Three.js 3D viewer) and static `web_dashboard`.
-6. **Shared Storage**: `/app/data` holding raw uploads, COLMAP databases, dense stereo caches, point clouds (`.ply`), and meshes (`.glb`).
+6. **Database (RDS PostgreSQL)**: Hosts the `users` table (managed by `auth_service`) and `jobs`/`claims` relational schema.
+7. **Broker / Queue (Redis)**: Celery task queue and pub/sub WebSocket message bridge.
+8. **Shared Storage (Amazon EFS & S3)**: Amazon EFS (`/app/data`) for scratch COLMAP files and Amazon S3 for durable production assets.
 
 ```mermaid
 flowchart TD
     subgraph Client ["Clients"]
-        Mobile["iOS / Android App"]
-        Web["Next.js / Browser Viewer"]
+        Browser["Next.js Web / Mobile Client (Port 3000)"]
     end
 
-    subgraph Edge ["Edge / Ingress"]
-        CF["CloudFront (Frontend CDN)"]
-        ALB["Application Load Balancer"]
+    subgraph Ingress ["Edge & Ingress"]
+        ALB["Application Load Balancer (HTTPS Port 443)"]
     end
 
-    subgraph AppCluster ["AWS ECS Cluster (VPC Private Subnet)"]
-        FargateAPI["ECS Fargate: FastAPI Backend (x1-x2)"]
-        FargateFront["ECS Fargate or S3: Next.js Frontend"]
-        
-        subgraph StorageLayer ["Persistence Layer"]
-            RDS["Amazon RDS PostgreSQL (db.t4g.micro)"]
-            Redis["ElastiCache Redis / Container Redis"]
-            S3["S3 Bucket (Permanent Assets & Results)"]
-            EFS["Amazon EFS (Shared Scratch & COLMAP Workspace)"]
-        end
-
-        subgraph WorkerCompute ["Worker Layer (Task Execution)"]
-            GPUWorker["ECS EC2 / AWS Batch Worker (g4dn.xlarge)
-Auto-Scaled to 0 when queue is empty"]
-            CPUWorker["ECS Fargate Worker (Optional for lightweight jobs)"]
-        end
+    subgraph CoreServices ["Lightweight Services (Phase 1 — Current)"]
+        AuthSvc["Auth Service (Fargate :8002)\n• Google OAuth 2.0 / OIDC\n• JWT Token Minting\n• Users Table in RDS"]
+        TourSvc["Tour Service (Fargate :8001)\n• Demo Point Cloud (.ply)\n• Floor Plan (.svg)\n• Zero DB Dependencies"]
+        RDS["Amazon RDS PostgreSQL\n(db.t4g.micro)\n• users table\n• claims & jobs schema"]
     end
 
-    Mobile -->|Uploads / Polling| ALB
-    Web -->|Static Assets| CF
-    Web -->|API & WebSocket| ALB
-    ALB --> FargateAPI
-    FargateAPI --> RDS
-    FargateAPI --> Redis
-    FargateAPI --> EFS
-    FargateAPI --> S3
+    subgraph HeavyPipeline ["Heavy Reconstruction Pipeline (Phase 2 — Pluggable)"]
+        MainAPI["Main Backend (Fargate :8000)\n• Job & Upload Dispatch\n• LLM Claim Orchestration"]
+        Redis["ElastiCache / Fargate Redis\n• Celery Broker & PubSub"]
+        EFS["Amazon EFS Storage\n• /app/data shared workspace"]
+        GPUWorker["EC2 Spot g4dn.xlarge\n• COLMAP CUDA SfM/MVS\n• Open3D RANSAC\n• Scales to 0 when idle"]
+        S3["Amazon S3 Bucket\n• Permanent 3D Assets (.ply/.glb)"]
+    end
+
+    Browser -->|Path: /api/v1/auth/*| ALB
+    Browser -->|Path: /api/v1/tour/*| ALB
+    Browser -->|Path: /jobs/*, /api/v1/*| ALB
+    Browser -->|Path: /* (Default)| ALB
+
+    ALB -->|Route Priority 10| AuthSvc
+    ALB -->|Route Priority 20| TourSvc
+    ALB -->|Route Priority 30| MainAPI
+
+    AuthSvc --> RDS
+    MainAPI --> RDS
+    MainAPI --> Redis
+    MainAPI --> EFS
 
     Redis -.->|Celery Queue| GPUWorker
     GPUWorker --> RDS
@@ -100,34 +102,59 @@ COLMAP makes thousands of random read/writes to local files (`db.db`, workspace 
 
 ---
 
-## 4. Cost Estimates for a "Couple of Users"
+## 4. Deployment Profiles & Cost Breakdown
 
-Assuming **2 to 5 active users** generating approximately **20 to 50 3D reconstruction jobs per month**:
+The infrastructure supports two decoupled deployment profiles controlled by a single Terraform flag (`enable_heavy_pipeline`):
 
-### Option A: Lean Serverless Architecture (Scale-to-Zero GPU Worker) — *Recommended*
-*ECS Fargate for API + Scale-to-Zero Spot `g4dn.xlarge` for Worker + RDS PostgreSQL + Containerized Redis on Fargate.*
+### Profile A: Lightweight Tour & Identity Deployment (Phase 1 — Current Target)
+*Deploys: Next.js Frontend (Fargate) + Auth Microservice (Fargate) + Tour Microservice (Fargate) + RDS PostgreSQL (`db.t4g.micro`) + ALB.*
+*Excludes: Redis, Celery, EFS, and EC2 GPU instances.*
 
-| Component | Sizing / Tier | Monthly Cost (USD) |
+| Component | Sizing / Configuration | Monthly Cost (USD) |
 | :--- | :--- | :--- |
-| **ECS Fargate (FastAPI)** | 0.5 vCPU, 1 GB RAM (running 24/7) | ~$11.00 |
-| **ECS Fargate (Redis)** | 0.25 vCPU, 0.5 GB RAM (runs lightweight broker) | ~$5.50 |
-| **Amazon RDS PostgreSQL** | `db.t4g.micro` (2 vCPU burstable, 1 GB RAM, 20 GB gp3 storage) | ~$14.00 |
-| **Application Load Balancer** | 1 ALB (shared between API and Frontend) | ~$18.00 |
-| **Amazon EFS** | 20 GB General Purpose (scratch workspace) | ~$6.00 |
-| **Amazon S3 & Data Transfer** | 50 GB storage + bandwidth | ~$2.50 |
-| **Worker GPU Compute (`g4dn.xlarge`)** | 50 jobs/month $\times$ 6 min = 5 hours total @ Spot ($0.16/hr) | **~$0.80** |
-| **AWS CloudWatch & Logs** | Basic metrics & log retention (7 days) | ~$2.00 |
-| **Estimated Total Monthly Cost** | | **~$59.80 / month** |
+| **Next.js Frontend** | ECS Fargate: 0.25 vCPU, 512 MB RAM (1 task) | ~$4.50 |
+| **Auth Microservice** | ECS Fargate: 0.25 vCPU, 256 MB RAM (1 task) | ~$3.50 |
+| **Guided Tour Microservice** | ECS Fargate: 0.25 vCPU, 256 MB RAM (1 task) | ~$3.50 |
+| **Amazon RDS PostgreSQL** | `db.t4g.micro` (Free-tier eligible for 12 months) | **$0.00** (or ~$13.50 after year 1) |
+| **Application Load Balancer** | 1 ALB (routes paths across all microservices) | ~$18.00 |
+| **Amazon ECR & CloudWatch Logs** | Minimal container registries & 7-day log retention | ~$2.00 |
+| **Total Monthly Cost (Profile A)** | | **~$31.50 / month** (or ~$18.00 with AWS Free Tier) |
 
-> [!TIP]
-> **Ultra-Lean Alternative (Single EC2 Instance for Dev/Staging)**:
-> If budget is tight during early testing, running all containers (`docker-compose.yml`) on a single **`t4g.large` (CPU-only, $48/mo)** or a **`g4dn.xlarge` that you stop automatically at night ($0.526/hr $\times$ 4 hrs/day = ~$63/mo)** eliminates the ALB and RDS overhead, bringing monthly costs down to **~$30 – $65/month**.
+> [!NOTE]
+> **Complete Blast Radius Protection**: In Profile A, there are zero Redis dependencies and zero Celery workers. The user login flow, Google OAuth handshake, and 3D walkthrough demo run with 100% uptime, unaffected by heavy spatial or worker code.
 
 ---
 
-## 5. Terraform (IaC) Directory Structure
+### Profile B: Full Reconstruction Pipeline (Phase 2 — Scale-to-Zero GPU Worker)
+*Adds: Main Backend API (Fargate) + Containerized Redis + Amazon EFS + Scale-to-Zero Spot `g4dn.xlarge` Worker.*
 
-A modular, clean Terraform architecture separating networking, data persistence, and container compute:
+| Additional Component | Sizing / Configuration | Additional Cost (USD) |
+| :--- | :--- | :--- |
+| **Main Backend API** | ECS Fargate: 0.5 vCPU, 1 GB RAM (1 task) | ~$11.00 |
+| **Redis Broker** | ECS Fargate: 0.25 vCPU, 512 MB RAM | ~$5.50 |
+| **Amazon EFS** | 20 GB General Purpose (Scratch workspace) | ~$6.00 |
+| **Amazon S3 & Data Transfer** | 50 GB permanent storage + egress | ~$2.50 |
+| **Worker GPU Compute (`g4dn.xlarge`)** | 50 jobs/month $\times$ 5 min = ~4.2 hrs @ Spot ($0.16/hr) | **~$0.80** |
+| **Total Monthly Cost (Profile B Combined)** | | **~$57.30 / month** |
+
+---
+
+## 5. Ingress Traffic Routing & Application Load Balancer Rules
+
+All traffic enters via port 443 (HTTPS) on a single Application Load Balancer. Listener rules route requests deterministically by path prefix:
+
+| Priority | Path Pattern | Target Group | Container Port | Service Role |
+| :--- | :--- | :--- | :--- | :--- |
+| **10** | `/api/v1/auth/*` | `tg-auth-service` | `8002` | Google OAuth, JWT tokens, users table |
+| **20** | `/api/v1/tour/*` | `tg-tour-service` | `8001` | Sample claim, point cloud PLY, SVG, tour chat |
+| **30** | `/api/v1/*`, `/jobs/*`, `/claims/*` | `tg-main-backend` | `8000` | Real upload processing & claims (Profile B) |
+| **100** | `/*` *(Default Rule)* | `tg-frontend` | `3000` | Next.js web application & 3D viewer UI |
+
+---
+
+## 6. Terraform (IaC) Modular Directory Structure
+
+A clean, modular Terraform hierarchy allowing instant toggling between Profile A (Lightweight) and Profile B (Full):
 
 ```
 terraform/
@@ -135,21 +162,22 @@ terraform/
 │   ├── dev/
 │   │   ├── main.tf
 │   │   ├── variables.tf
-│   │   └── terraform.tfvars
+│   │   └── terraform.tfvars           # enable_heavy_pipeline = false
 │   └── prod/
 │       ├── main.tf
 │       ├── variables.tf
 │       └── terraform.tfvars
 └── modules/
-    ├── vpc/                     # VPC, public/private subnets, NAT Gateway
-    ├── security/                # Security Groups & IAM roles (ECS Task Execution, S3/EFS policies)
-    ├── storage/                 # S3 buckets & EFS file system
-    ├── database/                # RDS PostgreSQL (db.t4g.micro)
-    ├── ecr/                     # Container registries for API, Worker, and Frontend
-    ├── ecs_cluster/             # ECS Cluster, Capacity Providers, Fargate & EC2 ASG
-    ├── ecs_services/            # Task definitions and services for API & Redis
-    ├── worker_asg/              # g4dn.xlarge Launch Template, Auto Scaling Group & Scaling Policies
-    └── alb/                     # ALB, Target Groups, HTTPS listener, Route53 records
+    ├── vpc/                           # VPC, 2 public & 2 private subnets, NAT Gateway
+    ├── security/                      # Security groups (ALB, ECS, RDS) & IAM execution roles
+    ├── database/                      # RDS PostgreSQL (db.t4g.micro in private subnet)
+    ├── alb/                           # ALB, HTTPS listener, SSL certificate, 4 Target Groups & path rules
+    ├── ecr/                           # Registries for frontend, auth_service, tour_service, backend, worker
+    ├── ecs_cluster/                   # ECS cluster definition & capacity providers
+    ├── ecs_services_lightweight/      # Fargate services for Frontend (3000), Auth (8002), Tour (8001)
+    ├── storage_heavy/                 # [Profile B] EFS file system and S3 bucket (count = enable_heavy_pipeline ? 1 : 0)
+    ├── ecs_services_heavy/            # [Profile B] Fargate services for Main API (8000) & Redis
+    └── worker_asg/                    # [Profile B] g4dn.xlarge Launch Template, Auto Scaling Group (0-2)
 ```
 
 ---
@@ -331,40 +359,71 @@ resource "aws_ecs_task_definition" "celery_gpu_worker" {
 
 ---
 
-## 7. Container Images Refactoring Needed
+## 7. Container Images Inventory & Status
 
-To deploy cleanly on AWS:
-1. **GPU-enabled Dockerfile for Worker**:
-   Base image should be `nvidia/cuda:12.2.2-runtime-ubuntu22.04` with COLMAP compiled with CUDA support:
-   ```dockerfile
-   FROM nvidia/cuda:12.2.2-devel-ubuntu22.04 AS builder
-   # Install COLMAP with CUDA enabled
-   ...
-   ```
-2. **FastAPI Backend Dockerfile**:
-   Can remain a lightweight Python 3.11/3.12 slim image (no GPU needed for API endpoints).
-3. **Frontend Dockerfile**:
-   Next.js standalone build:
-   ```dockerfile
-   FROM node:20-alpine AS runner
-   WORKDIR /app
-   COPY --from=builder /app/.next/standalone ./
-   COPY --from=builder /app/.next/static ./.next/static
-   CMD ["node", "server.js"]
-   ```
+| Image | Base Image | Size | Build Context | Deployment Profile | Current Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **`claimspace-auth-service`** | `python:3.11-slim` | ~115 MB | `./auth_service` | Profile A & B | ✅ **Ready** ([Dockerfile](file:///Users/aadarshkt/Desktop/3DReconstruction/auth_service/Dockerfile)) |
+| **`claimspace-tour-service`** | `python:3.11-slim` | ~125 MB | `./tour_service` | Profile A & B | ✅ **Ready** ([Dockerfile](file:///Users/aadarshkt/Desktop/3DReconstruction/tour_service/Dockerfile)) |
+| **`claimspace-frontend`** | `node:20-alpine` | ~160 MB | `./frontend` | Profile A & B | ⏳ **Needs Dockerfile** (Next.js Standalone) |
+| **`claimspace-backend`** | `python:3.11-slim` | ~220 MB | `./backend` | Profile B | ⏳ Future Phase (Split from heavy worker) |
+| **`claimspace-worker`** | `nvidia/cuda:12.2.2`| ~3.5 GB | `./backend` | Profile B | ⏳ Future Phase (CUDA + COLMAP + Open3D) |
 
 ---
 
-## 8. Rollout Phases
+## 8. Actionable Implementation Task List (Next Steps)
 
-1. **Phase 1: Container Hardening**:
-   - Split Dockerfiles into `Dockerfile.api`, `Dockerfile.worker` (CPU and GPU flavors), and `Dockerfile.web`.
-   - Update `app/config.py` to allow S3 presigned URL generation for results.
-2. **Phase 2: Terraform Baseline**:
-   - Provision VPC, Subnets, Security Groups, ECR, S3, and EFS.
-   - Deploy RDS PostgreSQL `db.t4g.micro` and Redis.
-3. **Phase 3: ECS Deployments**:
-   - Deploy FastAPI to Fargate behind ALB.
-   - Configure GPU Worker ASG on EC2 Spot (`g4dn.xlarge`) with Scale-to-Zero CloudWatch alarm on Redis queue depth.
-4. **Phase 4: Smoke Test & Validation**:
-   - Submit sample dataset via API -> verify GPU worker spin-up -> confirm 3D reconstruction completion in <6 min -> verify automated termination.
+### Phase 1: Container Hardening & Local Smoke Testing
+- [ ] **Task 1.1: Create Frontend Production Dockerfile**
+  - Create `frontend/Dockerfile` using multi-stage Node.js 20 Alpine and Next.js `standalone` output mode.
+  - Verify `frontend/next.config.ts` has `output: "standalone"` and proxies `/api/v1/auth/*` to `:8002` and `/api/v1/tour/*` to `:8001`.
+- [ ] **Task 1.2: Local Multi-Container Smoke Test**
+  - Run `auth_service` (port 8002) connected to local PostgreSQL.
+  - Run `tour_service` (port 8001).
+  - Run Next.js (port 3000).
+  - Confirm `/api/v1/auth/health`, `/api/v1/tour/health`, dev-login, and tour 3D viewer all function with zero errors.
+
+### Phase 2: Cloud Identity & Secrets Setup
+- [ ] **Task 2.1: Google Cloud Console OAuth Credentials**
+  - Configure OAuth Consent screen (External / ClaimSpace 3D).
+  - Add Authorized JavaScript origin (`https://<ALB_DOMAIN>`).
+  - Add Authorized Redirect URI (`https://<ALB_DOMAIN>/auth/callback`).
+  - Obtain `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+- [ ] **Task 2.2: AWS SSM Parameter Store Secret Provisioning**
+  - Create `/claimspace/production/GOOGLE_CLIENT_ID` (String).
+  - Create `/claimspace/production/GOOGLE_CLIENT_SECRET` (SecureString).
+  - Create `/claimspace/production/JWT_SECRET_KEY` (SecureString — 32-byte hex).
+  - Create `/claimspace/production/DATABASE_URL` (SecureString for RDS PostgreSQL).
+
+### Phase 3: Terraform Baseline Provisioning (Profile A: Lightweight)
+- [ ] **Task 3.1: Create Terraform Modules for Profile A**
+  - Write `modules/vpc` (2 public subnets, 2 private subnets, IGW, NAT Gateway).
+  - Write `modules/database` (RDS PostgreSQL `db.t4g.micro`, private-only, security group locked to ECS).
+  - Write `modules/ecr` (Repositories: `claimspace-frontend`, `claimspace-auth`, `claimspace-tour`).
+  - Write `modules/alb` (ALB with HTTPS listener and priority rules for `/api/v1/auth/*`, `/api/v1/tour/*`, and `/*`).
+  - Write `modules/ecs_services_lightweight` (Fargate task definitions and services for Frontend, Auth, and Tour).
+- [ ] **Task 3.2: Push Images to Amazon ECR**
+  - Build and tag `claimspace-frontend`, `claimspace-auth-service`, and `claimspace-tour-service`.
+  - Authenticate Docker with ECR and push all 3 images.
+- [ ] **Task 3.3: Apply Terraform Execution**
+  - Run `terraform init` and `terraform apply -var="enable_heavy_pipeline=false"`.
+
+### Phase 4: Production Verification & Smoke Testing
+- [ ] **Task 4.1: Database Schema Auto-Creation**
+  - Verify that upon first launch of `auth_service`, SQLAlchemy executes `create_all` and creates the `users` table on RDS.
+- [ ] **Task 4.2: Ingress & Health Checks**
+  - `curl https://<DOMAIN>/api/v1/auth/health` $\rightarrow$ returns 200 OK.
+  - `curl https://<DOMAIN>/api/v1/tour/health` $\rightarrow$ returns 200 OK.
+  - `curl https://<DOMAIN>/` $\rightarrow$ loads Next.js landing page.
+- [ ] **Task 4.3: OAuth End-to-End Verification**
+  - Click "Continue with Google" on production web app.
+  - Complete consent $\rightarrow$ callback redirects with authenticated JWT cookie.
+  - Inspect RDS `users` table to confirm user profile row was created with `role = 'user'` (or `'admin'` if matching `INITIAL_ADMIN_EMAIL`).
+- [ ] **Task 4.4: 3D Tour & AI Chat Smoke Test**
+  - Open `/tour` in browser.
+  - Confirm interactive 3D point cloud (`.ply`) and 2D floor plan (`.svg`) render in Three.js canvas.
+  - Ask sample chat question ("Is water damage covered?") $\rightarrow$ verifies sub-10ms policy response.
+
+### Phase 5: Future Activation of Profile B (Heavy 3D Reconstruction)
+- [ ] Split `backend/Dockerfile` into `Dockerfile.api` and `Dockerfile.worker`.
+- [ ] Set `enable_heavy_pipeline = true` in Terraform to provision Redis, Amazon EFS, and EC2 GPU Spot Auto Scaling Group (`g4dn.xlarge`).

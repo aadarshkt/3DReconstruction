@@ -18,11 +18,12 @@ if [ "$DETACHED" = true ]; then
     docker compose up -d --build
     echo ""
     echo "========================================================"
-    echo "✅  All services running in background (Docker)!"
-    echo "    - API Docs:   http://localhost:8000/docs"
-    echo "    - Dashboard:  http://localhost:8000"
-    echo "    - View logs:  ./run.sh logs"
-    echo "    - Stop stack: ./run.sh stop"
+    echo "✅  All microservices running in background (Docker)!"
+    echo "    - Main Backend: http://localhost:8000 (Docs: /docs)"
+    echo "    - Tour Service: http://localhost:8001"
+    echo "    - Auth Service: http://localhost:8002"
+    echo "    - View logs:    ./run.sh logs"
+    echo "    - Stop stack:   ./run.sh stop"
     echo "========================================================"
 else
     cleanup() {

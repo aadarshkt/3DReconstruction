@@ -1,0 +1,6 @@
+aws_region            = "us-east-1"
+environment           = "prod"
+google_client_id      = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+google_client_secret  = "YOUR_GOOGLE_CLIENT_SECRET"
+jwt_secret_key        = "YOUR_32_BYTE_HEX_KEY"
+enable_heavy_pipeline = false

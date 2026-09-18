@@ -4,20 +4,32 @@
                          ┌─────────────────────────────────────────┐
                          │           Next.js Frontend              │
                          │           (Port 3000)                   │
-                         └───────┬─────────────────────────┬───────┘
-                                 │                         │
-            /jobs/*, /claims/*   │                         │ /api/v1/tour/*
-            (Real User Workload) │                         │ (Demo & Walkthrough)
-                                 ▼                         ▼
-            ┌───────────────────────────┐        ┌──────────────────────────┐
-            │   Main Backend Service    │        │  Guided Tour Service     │
-            │   (FastAPI - Port 8000)   │        │  (FastAPI - Port 8001)   │
-            ├───────────────────────────┤        ├──────────────────────────┤
-            │ • PostgreSQL DB           │        │ • Zero DB Dependencies   │
-            │ • Celery / Redis Workers  │        │ • Standalone Artifacts   │
-            │ • COLMAP / Open3D / GPU   │        │ • Sub-10ms Response Time │
-            │ • External LLM API Keys   │        │ • Self-Contained Engine  │
-            └───────────────────────────┘        └──────────────────────────┘
+                         └───────┬──────────────┬──────────┬───────┘
+                                 │              │          │
+            /jobs/*, /claims/*   │              │          │ /api/v1/tour/*
+            (Real User Workload) │              │          │ (Demo & Walkthrough)
+                                 ▼              │          ▼
+            ┌───────────────────────────┐       │   ┌──────────────────────────┐
+            │   Main Backend Service    │       │   │  Guided Tour Service     │
+            │   (FastAPI - Port 8000)   │       │   │  (FastAPI - Port 8001)   │
+            ├───────────────────────────┤       │   ├──────────────────────────┤
+            │ • Stateless JWT Validate  │       │   │ • Zero DB Dependencies   │
+            │ • Celery / Redis Workers  │       │   │ • Standalone Artifacts   │
+            │ • COLMAP / Open3D / GPU   │       │   │ • Sub-10ms Response Time │
+            │ • External LLM API Keys   │       │   │ • Self-Contained Engine  │
+            └───────────────────────────┘       │   └──────────────────────────┘
+                                                │
+                                 /api/v1/auth/* │
+                                 (Identity/OIDC)▼
+                                    ┌──────────────────────────┐
+                                    │    Auth Microservice     │
+                                    │  (FastAPI - Port 8002)   │
+                                    ├──────────────────────────┤
+                                    │ • Google OAuth 2.0 / OIDC│
+                                    │ • RBAC Role Management   │
+                                    │ • JWT Issuance & Verify  │
+                                    │ • PostgreSQL Users Table │
+                                    └──────────────────────────┘
 ```
 
 ---

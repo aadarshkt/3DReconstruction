@@ -85,10 +85,16 @@ AWS VPC (10.0.0.0/16)
 │   ├── NAT Gateway
 │   └── Application Load Balancer (ALB)
 │       └── Port 80 / 443 Listeners (ACM SSL Certificate)
+│           ├── Priority 10: /api/v1/auth* ──► Auth Microservice (Port 8002)
+│           ├── Priority 20: /api/v1/tour* ──► Tour Microservice (Port 8001)
+│           ├── Priority 30: /api/*, /jobs*, /claims* ──► Main Backend (Port 8000)
+│           └── Priority 100: /* (Default) ──► Next.js Frontend (Port 3000)
 │
 └── Private Subnets (10.0.10.0/24, 10.0.20.0/24)
     ├── ECS Fargate Cluster
     │   ├── Next.js Service (Port 3000)
+    │   ├── Auth Service (Port 8002)
+    │   ├── Tour Service (Port 8001)
     │   └── FastAPI Backend Service (Port 8000)
     │
     └── DB Subnet Group (Private Only)

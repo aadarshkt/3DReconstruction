@@ -104,13 +104,12 @@ async def create_claim(
     return claim
 
 
-from app.core.security import require_admin, require_user, get_current_user
-from app.models.user import User
+from app.core.security import require_admin, require_user, get_current_user, AuthenticatedUser
 
 @router.post("/seed-demo")
 async def seed_demo_endpoint(
     db: AsyncSession = Depends(get_db),
-    admin_user: User = Depends(require_admin),
+    admin_user: AuthenticatedUser = Depends(require_admin),
 ):
     """
     1-Click Seed Endpoint for closed-loop testing.

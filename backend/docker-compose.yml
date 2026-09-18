@@ -87,6 +87,43 @@ services:
       - ./data:/app/data
     command: celery -A app.tasks.celery_tasks worker --loglevel=info --concurrency=1
 
+  # Authentication Microservice (Google OAuth 2.0, Sessions, RBAC)
+  auth:
+    build:
+      context: ../auth_service
+      dockerfile: Dockerfile
+    container_name: floorplan_auth
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-floorplan}:${POSTGRES_PASSWORD:-floorplan_secret}@db:5432/${POSTGRES_DB:-floorplan}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-super_secret_jwt_key_claimspace_change_in_production_2026}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-admin@claimspace.com}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-true}
+    volumes:
+      - ../auth_service:/app
+    ports:
+      - "8002:8002"
+    command: uvicorn main:app --host 0.0.0.0 --port 8002 --reload
+
+  # Guided Tour Microservice (Deterministic Demo Assets & Walkthrough)
+  tour:
+    build:
+      context: ../tour_service
+      dockerfile: Dockerfile
+    container_name: floorplan_tour
+    restart: unless-stopped
+    volumes:
+      - ../tour_service:/app
+    ports:
+      - "8001:8001"
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+
 # ── Volumes ───────────────────────────────────────────────────────────────────
 volumes:
   postgres_data:
