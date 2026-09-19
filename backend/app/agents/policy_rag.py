@@ -9,9 +9,18 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
-import chromadb
-from chromadb.config import Settings as ChromaSettings
-import pdfplumber
+try:
+    import chromadb
+    from chromadb.config import Settings as ChromaSettings
+except ImportError:
+    chromadb = None  # type: ignore
+    ChromaSettings = None  # type: ignore
+
+try:
+    import pdfplumber
+except ImportError:
+    pdfplumber = None  # type: ignore
+
 import structlog
 
 from app.agents.llm_client import LLMClient
@@ -82,10 +91,14 @@ class PolicyRAGEngine:
     ):
         self.persist_dir = persist_dir or settings.CHROMA_PERSIST_DIR
         self.persist_dir.mkdir(parents=True, exist_ok=True)
-        self.client = chromadb.PersistentClient(
-            path=str(self.persist_dir),
-            settings=ChromaSettings(anonymized_telemetry=False),
-        )
+        if chromadb is not None and ChromaSettings is not None:
+            self.client = chromadb.PersistentClient(
+                path=str(self.persist_dir),
+                settings=ChromaSettings(anonymized_telemetry=False),
+            )
+        else:
+            self.client = None
+            log.warning("chromadb_not_available", msg="ChromaDB not available; policy RAG vector storage disabled.")
         self.llm_client = llm_client or LLMClient()
 
     def _get_collection_name(self, claim_id: str) -> str:
@@ -101,6 +114,10 @@ class PolicyRAGEngine:
         path = Path(pdf_path)
         if not path.exists():
             raise FileNotFoundError(f"PDF not found at {pdf_path}")
+
+        if pdfplumber is None:
+            log.warning("pdfplumber_not_available", msg="pdfplumber not available; cannot extract text from PDF.")
+            return []
 
         pages_data = []
         with pdfplumber.open(path) as pdf:

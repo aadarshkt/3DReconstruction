@@ -265,7 +265,10 @@ export default function UploadSection({
         body: formData,
       });
 
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `Upload request failed (${res.status})`);
+      }
       const job = await res.json();
 
       setStatusMessage(`Media uploaded (${job.tier} modality). Running 3D reconstruction...`);
@@ -279,13 +282,21 @@ export default function UploadSection({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tier: activeMediaTab }),
         });
+        if (!createRes.ok) {
+          const createErr = await createRes.text();
+          throw new Error(createErr || `Job creation failed (${createRes.status})`);
+        }
         const job = await createRes.json();
 
         const formData = new FormData();
         for (let i = 0; i < files.length; i++) {
           formData.append("files", files[i]);
         }
-        await fetch(`/jobs/${job.job_id}/upload`, { method: "POST", body: formData });
+        const uploadRes = await fetch(`/jobs/${job.job_id}/upload`, { method: "POST", body: formData });
+        if (!uploadRes.ok) {
+          const uploadErr = await uploadRes.text();
+          throw new Error(uploadErr || `File upload failed (${uploadRes.status})`);
+        }
         await fetch(`/jobs/${job.job_id}/start`, { method: "POST" });
 
         setStatusMessage("Processing 3D spatial reconstruction...");

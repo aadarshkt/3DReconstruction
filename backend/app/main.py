@@ -35,6 +35,26 @@ async def lifespan(app: FastAPI):
     log.info("startup", msg="Creating database tables if needed…")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Ensure schema additions exist on existing tables without manual migrations
+        from sqlalchemy import text
+        schema_patches = [
+            "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS is_demo BOOLEAN DEFAULT FALSE;",
+            "ALTER TABLE claims ADD COLUMN IF NOT EXISTS property_type VARCHAR(64) DEFAULT 'residential';",
+            "ALTER TABLE claims ADD COLUMN IF NOT EXISTS damage_description TEXT DEFAULT '';",
+            "ALTER TABLE claims ADD COLUMN IF NOT EXISTS date_of_loss VARCHAR(64);",
+            "ALTER TABLE claims ADD COLUMN IF NOT EXISTS cause_of_loss VARCHAR(64) DEFAULT 'water';",
+            "ALTER TABLE claims ADD COLUMN IF NOT EXISTS insurer_name VARCHAR(128);",
+            "ALTER TABLE claims ADD COLUMN IF NOT EXISTS has_policy_pdf BOOLEAN DEFAULT FALSE;",
+            "ALTER TABLE claims ADD COLUMN IF NOT EXISTS policy_pdf_path VARCHAR(512);",
+            "ALTER TABLE claims ADD COLUMN IF NOT EXISTS policy_analysis JSON;",
+            "ALTER TABLE claims ADD COLUMN IF NOT EXISTS cost_estimate JSON;",
+            "ALTER TABLE claims ADD COLUMN IF NOT EXISTS total_estimated_cost FLOAT;",
+        ]
+        for patch in schema_patches:
+            try:
+                await conn.execute(text(patch))
+            except Exception as e:
+                log.warning("schema_patch_warning", patch=patch, error=str(e))
 
     # Ensure data directory exists
     settings.DATA_DIR.mkdir(parents=True, exist_ok=True)

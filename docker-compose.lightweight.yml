@@ -32,9 +32,12 @@ services:
     ports:
       - "3000:3000"
     environment:
+      - BACKEND_URL=http://host.docker.internal:8000
       - AUTH_SERVICE_URL=http://auth_service:8002
       - TOUR_SERVICE_URL=http://tour_service:8001
       - NODE_ENV=production
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - auth_service
       - tour_service

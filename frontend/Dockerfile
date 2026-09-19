@@ -13,8 +13,10 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+ARG BACKEND_URL=http://host.docker.internal:8000
 ARG AUTH_SERVICE_URL=http://auth_service:8002
 ARG TOUR_SERVICE_URL=http://tour_service:8001
+ENV BACKEND_URL=$BACKEND_URL
 ENV AUTH_SERVICE_URL=$AUTH_SERVICE_URL
 ENV TOUR_SERVICE_URL=$TOUR_SERVICE_URL
 
@@ -43,4 +45,4 @@ USER nextjs
 
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "node -e \"const fs=require('fs'); ['server.js', '.next/routes-manifest.json', '.next/required-server-files.json'].forEach(f => { if(fs.existsSync(f)){ let c = fs.readFileSync(f, 'utf8'); if(process.env.BACKEND_URL) c = c.replaceAll('http://localhost:8000', process.env.BACKEND_URL); if(process.env.AUTH_SERVICE_URL) c = c.replaceAll('http://auth_service:8002', process.env.AUTH_SERVICE_URL); if(process.env.TOUR_SERVICE_URL) c = c.replaceAll('http://tour_service:8001', process.env.TOUR_SERVICE_URL); fs.writeFileSync(f, c); } });\" && node server.js"]
