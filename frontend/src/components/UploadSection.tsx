@@ -55,6 +55,46 @@ export default function UploadSection({
   const [progressStage, setProgressStage] = useState("");
   const wsRef = useRef<WebSocket | null>(null);
 
+  // Scale Reference Option A state
+  const [scaleRefPreset, setScaleRefPreset] = useState<"door" | "ceiling" | "paper" | "custom" | "none">("door");
+  const [scaleValue, setScaleValue] = useState<string>("2.03");
+  const [scaleUnit, setScaleUnit] = useState<"m" | "ft">("m");
+  const [showCaptureTips, setShowCaptureTips] = useState<boolean>(false);
+
+  const handlePresetSelect = (preset: "door" | "ceiling" | "paper" | "custom" | "none") => {
+    setScaleRefPreset(preset);
+    if (preset === "door") {
+      setScaleValue(scaleUnit === "m" ? "2.03" : "6.66");
+    } else if (preset === "ceiling") {
+      setScaleValue(scaleUnit === "m" ? "2.40" : "7.87");
+    } else if (preset === "paper") {
+      setScaleValue(scaleUnit === "m" ? "0.297" : "0.97");
+    } else if (preset === "none") {
+      setScaleValue("");
+    }
+  };
+
+  const handleUnitToggle = (unit: "m" | "ft") => {
+    if (unit === scaleUnit) return;
+    setScaleUnit(unit);
+    const num = parseFloat(scaleValue);
+    if (!isNaN(num) && num > 0) {
+      if (unit === "ft") {
+        setScaleValue((num / 0.3048).toFixed(2));
+      } else {
+        setScaleValue((num * 0.3048).toFixed(2));
+      }
+    }
+  };
+
+  const effectiveScaleM: string | null = (() => {
+    if (activeMediaTab === "lidar" || scaleRefPreset === "none") return null;
+    const num = parseFloat(scaleValue);
+    if (isNaN(num) || num <= 0) return null;
+    const inMeters = scaleUnit === "ft" ? num * 0.3048 : num;
+    return inMeters.toFixed(3);
+  })();
+
   // Initial scanData is null unless jobData is already provided or demo is active
   const [scanData, setScanData] = useState<ScanData | null>(() => {
     if (jobData && (jobData.areaM2 || jobData.room_area_m2)) {
@@ -259,6 +299,9 @@ export default function UploadSection({
         formData.append("files", files[i]);
       }
       formData.append("auto_start", "true");
+      if (effectiveScaleM) {
+        formData.append("scale_reference_m", effectiveScaleM);
+      }
 
       const res = await fetch("/jobs/create-and-upload", {
         method: "POST",
@@ -271,7 +314,7 @@ export default function UploadSection({
       }
       const job = await res.json();
 
-      setStatusMessage(`Media uploaded (${job.tier} modality). Running 3D reconstruction...`);
+      setStatusMessage(`Media uploaded (${job.tier} modality${effectiveScaleM ? ` · scale ~${effectiveScaleM}m` : ""}). Running 3D reconstruction...`);
       onJobLoaded(job, false);
       connectProgressWebSocket(job.job_id);
     } catch (err: any) {
@@ -280,7 +323,10 @@ export default function UploadSection({
         const createRes = await fetch("/jobs/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tier: activeMediaTab }),
+          body: JSON.stringify({ 
+            tier: activeMediaTab,
+            ...(effectiveScaleM ? { scale_reference_m: parseFloat(effectiveScaleM) } : {}),
+          }),
         });
         if (!createRes.ok) {
           const createErr = await createRes.text();
@@ -405,6 +451,189 @@ export default function UploadSection({
           </div>
         </div>
 
+        {/* Scale Reference & Guidance Card (Option A) */}
+        {activeMediaTab !== "lidar" ? (
+          <div
+            className="p-4 sm:p-5 rounded-2xl border space-y-3.5 transition-all shadow-xs"
+            style={{
+              backgroundColor: "var(--bg-surface)",
+              borderColor: "var(--border-default)",
+            }}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--accent-subtle)] text-[var(--accent)] font-mono text-sm font-semibold">
+                  📐
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs sm:text-sm font-semibold text-[var(--text-primary)]">
+                      Metric Scale Reference
+                    </span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
+                      Recommended
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                    Photos alone lack real-world scale. Selecting a known reference anchors real-world metres for accurate floor plans and 3D walls.
+                  </p>
+                </div>
+              </div>
+
+              {/* Active Status Badge */}
+              <div className="shrink-0">
+                {effectiveScaleM ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-medium border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Scale Anchor: {effectiveScaleM} m
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono text-[var(--text-muted)] border border-[var(--border-subtle)]">
+                    Relative / Unscaled
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Presets */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--text-secondary)] font-semibold">
+                Reference Preset
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                {[
+                  { key: "door", label: "Door Height", sub: "2.03m / 6.7ft", icon: "🚪" },
+                  { key: "ceiling", label: "Ceiling Height", sub: "2.40m / 7.9ft", icon: "🏠" },
+                  { key: "paper", label: "Paper on Floor", sub: "0.30m / A4", icon: "📄" },
+                  { key: "custom", label: "Custom Length", sub: "Manual length", icon: "📏" },
+                  { key: "none", label: "Unscaled", sub: "Relative units", icon: "⚪" },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => handlePresetSelect(item.key as any)}
+                    className={`btn-squish flex flex-col items-start p-2 rounded-xl border text-left transition-all ${
+                      scaleRefPreset === item.key
+                        ? "border-[var(--accent)] bg-[var(--accent-subtle)] shadow-xs"
+                        : "border-[var(--border-subtle)] bg-[var(--bg-card)] hover:border-[var(--border-default)]"
+                    }`}
+                  >
+                    <span className="text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1">
+                      <span>{item.icon}</span> {item.label}
+                    </span>
+                    <span className="text-[10px] font-mono text-[var(--text-muted)] mt-0.5">
+                      {item.sub}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Fine-tune Value Input & Guidance Text (if not unscaled) */}
+            {scaleRefPreset !== "none" && (
+              <div className="p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[var(--bg-card)]" style={{ borderColor: "var(--border-subtle)" }}>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-[var(--text-secondary)] font-medium shrink-0">
+                    Target Reference Length:
+                  </label>
+                  <div className="flex items-center rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] px-2 py-1 shadow-inner focus-within:border-[var(--accent)]">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.05"
+                      max="50"
+                      value={scaleValue}
+                      onChange={(e) => setScaleValue(e.target.value)}
+                      className="w-20 bg-transparent text-xs font-mono font-semibold text-[var(--text-primary)] focus:outline-hidden"
+                      placeholder="e.g. 2.03"
+                    />
+                  </div>
+                  {/* Unit toggle */}
+                  <div className="flex items-center rounded-lg border border-[var(--border-subtle)] p-0.5 bg-[var(--bg-surface)]">
+                    <button
+                      type="button"
+                      onClick={() => handleUnitToggle("m")}
+                      className={`px-2 py-0.5 text-[10px] font-mono font-semibold rounded-md transition-all ${
+                        scaleUnit === "m"
+                          ? "bg-[var(--accent)] text-white shadow-xs"
+                          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      }`}
+                    >
+                      m
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUnitToggle("ft")}
+                      className={`px-2 py-0.5 text-[10px] font-mono font-semibold rounded-md transition-all ${
+                        scaleUnit === "ft"
+                          ? "bg-[var(--accent)] text-white shadow-xs"
+                          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      }`}
+                    >
+                      ft
+                    </button>
+                  </div>
+                </div>
+
+                {/* Specific Tip */}
+                <span className="text-[11px] text-[var(--text-muted)] italic">
+                  {scaleRefPreset === "door" && "🚪 Include full door height in at least 3 overlapping photos."}
+                  {scaleRefPreset === "ceiling" && "🏠 Ensure vertical wall-to-ceiling corners appear in 3+ photos."}
+                  {scaleRefPreset === "paper" && "📄 Place standard Letter / A4 paper flat in view on the floor."}
+                  {scaleRefPreset === "custom" && "📏 Measured distance between two visible landmarks in photos."}
+                </span>
+              </div>
+            )}
+
+            {/* Collapsible Capture Guidance */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowCaptureTips(!showCaptureTips)}
+                className="inline-flex items-center gap-1.5 text-[11px] font-mono text-[var(--accent)] hover:underline focus:outline-hidden"
+              >
+                <span>{showCaptureTips ? "▼ Hide photo capture recommendations" : "▶ Show photogrammetry capture recommendations"}</span>
+              </button>
+
+              {showCaptureTips && (
+                <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                  <div className="p-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] space-y-1">
+                    <span className="font-semibold text-[var(--text-primary)] flex items-center gap-1">
+                      🔄 60–80% Overlap
+                    </span>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      Take a photo every 1–2 steps around the room. Each feature should appear in at least 3 photos.
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] space-y-1">
+                    <span className="font-semibold text-[var(--text-primary)] flex items-center gap-1">
+                      💡 Even Illumination
+                    </span>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      Turn all lights on. Avoid heavy shadows or moving objects during capture.
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] space-y-1">
+                    <span className="font-semibold text-[var(--text-primary)] flex items-center gap-1">
+                      📐 Chest-Level Steady
+                    </span>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      Keep camera at steady chest height; avoid switching zoom lenses or extreme fisheye.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="p-3.5 rounded-xl border border-blue-500/20 bg-blue-500/5 flex items-center gap-2.5 text-xs text-blue-700 dark:text-blue-300">
+            <span className="text-base">✨</span>
+            <div>
+              <span className="font-semibold">Native LiDAR Metric Scale:</span> LiDAR scans (.usdz, .ply) from iPhone Pro contain hardware-calibrated metric coordinates automatically.
+            </div>
+          </div>
+        )}
+
         <div
           onDragOver={(e) => {
             e.preventDefault();
@@ -454,6 +683,11 @@ export default function UploadSection({
             </p>
             <p className="text-[11px] text-[var(--text-muted)] max-w-sm sm:max-w-none">
               Supports photos (JPG/PNG/HEIC), continuous video (MP4/MOV), and LiDAR (USDZ/PLY/JSON).
+              {effectiveScaleM && (
+                <span className="block mt-1 text-[var(--accent)] font-medium">
+                  Active metric anchor: {effectiveScaleM} m ({scaleRefPreset === "door" ? "Standard Door" : scaleRefPreset === "ceiling" ? "Ceiling Height" : scaleRefPreset === "paper" ? "A4 Paper" : "Custom"})
+                </span>
+              )}
             </p>
           </div>
 

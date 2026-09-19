@@ -147,7 +147,7 @@ async def upload_files(
 @router.post("/create-and-upload", status_code=201)
 async def create_and_upload(
     files: List[UploadFile] = File(..., description="One or more capture files"),
-    scale_reference_m: Optional[float] = Form(None, description="Optional scale reference length in metres"),
+    scale_reference_m: Optional[str] = Form(None, description="Optional scale reference length in metres"),
     auto_start: bool = Form(False, description="Whether to enqueue reconstruction immediately"),
     db: AsyncSession = Depends(get_db),
 ):
@@ -161,8 +161,17 @@ async def create_and_upload(
     if not files:
         raise HTTPException(status_code=400, detail="No files provided.")
 
+    parsed_scale_ref: Optional[float] = None
+    if scale_reference_m is not None and str(scale_reference_m).strip():
+        try:
+            val = float(str(scale_reference_m).strip())
+            if 0.01 <= val <= 100.0:
+                parsed_scale_ref = val
+        except (ValueError, TypeError):
+            parsed_scale_ref = None
+
     # Create placeholder job
-    job = Job(tier=Tier.photos, scale_reference_m=scale_reference_m)
+    job = Job(tier=Tier.photos, scale_reference_m=parsed_scale_ref)
     db.add(job)
     await db.commit()
     await db.refresh(job)
