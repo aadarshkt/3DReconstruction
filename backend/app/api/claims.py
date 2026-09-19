@@ -48,6 +48,7 @@ class CostEstimateRequest(BaseModel):
     overhead_and_profit_pct: float = Field(10.0, description="Contractor Overhead & Profit percentage")
     deductible_override: Optional[float] = Field(None, description="Override deductible amount")
     coverage_limit_override: Optional[float] = Field(None, description="Override coverage limit amount")
+    damage_area_override: Optional[float] = Field(None, description="User-selected damage area in m² from 2D floor plan")
 
 
 
@@ -394,6 +395,14 @@ async def estimate_claim_costs(
             "damage_description": claim.damage_description,
             "property_type": claim.property_type,
         }
+
+        # Apply damage area override if user adjusted on 2D floor plan
+        if req.damage_area_override is not None:
+            if reconstruction_metrics is None:
+                reconstruction_metrics = {"room_area_m2": 24.5, "wall_count": 4}
+            else:
+                reconstruction_metrics = dict(reconstruction_metrics)
+            reconstruction_metrics["damage_area_m2"] = req.damage_area_override
 
         # Use overrides if provided, otherwise default to policy analysis
         policy_analysis = claim.policy_analysis or {}

@@ -13,20 +13,26 @@ from app.agents.prompts import COST_SCOPING_SYSTEM_PROMPT
 
 log = structlog.get_logger()
 
-# Standard US Residential Repair & Restoration Rate Table (USD per unit)
+# ==============================================================================
+# [PLACEHOLDER / HARDCODED RATES]
+# The rates below are standardized US residential repair and restoration baseline
+# estimates (USD). In production, these values should be queried dynamically from
+# commercial construction databases (e.g., Verisk Xactimate API, CoreLogic Symbility,
+# or Gordian RSMeans) filtered by the property's postal zip code and current quarter.
+# ==============================================================================
 RATE_TABLE: dict[str, dict[str, Any]] = {
     "drywall_repair": {
         "description": "Drywall patch, tape, skim coat, and sand",
         "unit": "m2",
-        "material": 12.0,
-        "labor": 25.0,
+        "material": 12.0,  # [HARDCODED PLACEHOLDER]
+        "labor": 25.0,     # [HARDCODED PLACEHOLDER]
         "total": 37.0,
     },
     "drywall_replace": {
         "description": "Tear out damaged drywall, hang 1/2in sheetrock, tape & finish",
         "unit": "m2",
-        "material": 18.0,
-        "labor": 35.0,
+        "material": 18.0,  # [HARDCODED PLACEHOLDER]
+        "labor": 35.0,     # [HARDCODED PLACEHOLDER]
         "total": 53.0,
     },
     "interior_paint": {
@@ -193,6 +199,9 @@ class CostEngine:
         Rule-based scoping fallback used if the LLM API is unavailable.
         Uses exact 3D metrics to create baseline repair line items.
         """
+        # [PLACEHOLDER HEURISTICS]: Scoping multipliers (e.g. 1.5x paint blending,
+        # 2.0x extraction zone, 2ft flood-cut perimeter) are standard IICRC S500 restoration
+        # defaults. In production, adjusters define exact scoping rules or use computer vision.
         damage_area = float(metrics.get("damage_area_m2") or 5.0)
         room_area = float(metrics.get("room_area_m2") or 20.0)
         wall_length = float(metrics.get("estimated_wall_length_m") or (damage_area / 2.4))

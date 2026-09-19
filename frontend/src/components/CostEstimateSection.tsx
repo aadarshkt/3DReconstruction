@@ -34,7 +34,7 @@ export default function CostEstimateSection({
   const [mobileView, setMobileView] = useState<"cards" | "table">("cards");
 
   useEffect(() => {
-    if (policyDeductible) {
+    if (policyDeductible != null) {
       setDeductible(policyDeductible);
     }
   }, [policyDeductible]);
@@ -46,62 +46,79 @@ export default function CostEstimateSection({
   const wallPerimeterM = jobData?.walls
     ? jobData.walls.reduce((sum: number, w: any) => sum + (Number(w.length_m) || 0), 0)
     : (isDemo ? 19.8 : 0);
-  const damageAreaM2 = jobData?.damageAreaM2 || (roomAreaM2 > 0 ? Number((roomAreaM2 * 0.74).toFixed(1)) : 0);
 
-  // Deterministic Line Items computed from physical 3D scan
+  // Use user-selected damageAreaM2 from interactive 2D floor plan if available
+  const [activeDamageAreaM2, setActiveDamageAreaM2] = useState<number>(() => {
+    if (jobData?.damageAreaM2 != null) return Number(jobData.damageAreaM2);
+    return isDemo ? 18.2 : Number((roomAreaM2 * 0.74).toFixed(1));
+  });
+
+  // Sync if jobData.damageAreaM2 updates from 2D floor plan drag
+  useEffect(() => {
+    if (jobData?.damageAreaM2 != null) {
+      setActiveDamageAreaM2(Number(jobData.damageAreaM2));
+    }
+  }, [jobData?.damageAreaM2]);
+
+  // ==============================================================================
+  // [PLACEHOLDER / HARDCODED RATES]
+  // In production, these unit prices ($32.50, $28.00, $46.00, $112.00, $18.50, $22.00)
+  // are dynamically retrieved from the Verisk Xactimate API, CoreLogic Symbility,
+  // or Gordian RSMeans database based on the property zip code and current quarter.
+  // ==============================================================================
   const lineItems: CostLineItem[] = [
     {
       code: "WTR-EXT-01",
       category: "Water Remediation",
       description: "Emergency surface water extraction & containment barriers",
-      quantity: damageAreaM2 || roomAreaM2,
+      quantity: activeDamageAreaM2 || roomAreaM2,
       unit: "m²",
-      unit_price: 32.5,
-      total: (damageAreaM2 || roomAreaM2) * 32.5,
+      unit_price: 32.5, // [HARDCODED PLACEHOLDER: $32.50/m²]
+      total: (activeDamageAreaM2 || roomAreaM2) * 32.5,
     },
     {
       code: "DRW-REM-02",
       category: "Demolition",
       description: "Tear out water-damaged drywall (flood cut to 2ft perimeter)",
-      quantity: wallPerimeterM * 0.6,
+      quantity: Number((wallPerimeterM * 0.6).toFixed(1)),
       unit: "m²",
-      unit_price: 28.0,
+      unit_price: 28.0, // [HARDCODED PLACEHOLDER: $28.00/m²]
       total: wallPerimeterM * 0.6 * 28.0,
     },
     {
       code: "DRW-INS-03",
       category: "Drywall & Finish",
       description: "Install 5/8in moisture-resistant gypsum wallboard, taped & sanded",
-      quantity: wallPerimeterM * 0.6,
+      quantity: Number((wallPerimeterM * 0.6).toFixed(1)),
       unit: "m²",
-      unit_price: 46.0,
+      unit_price: 46.0, // [HARDCODED PLACEHOLDER: $46.00/m²]
       total: wallPerimeterM * 0.6 * 46.0,
     },
     {
       code: "FLR-OAK-04",
       category: "Flooring",
       description: "Remove buckled hardwood and install engineered White Oak plank",
-      quantity: damageAreaM2 || roomAreaM2,
+      quantity: activeDamageAreaM2 || roomAreaM2,
       unit: "m²",
-      unit_price: 112.0,
-      total: (damageAreaM2 || roomAreaM2) * 112.0,
+      unit_price: 112.0, // [HARDCODED PLACEHOLDER: $112.00/m²]
+      total: (activeDamageAreaM2 || roomAreaM2) * 112.0,
     },
     {
       code: "PNT-WAL-05",
       category: "Painting",
       description: "Apply mildew-resistant primer and two coats acrylic eggshell finish",
-      quantity: wallPerimeterM * 2.7,
+      quantity: Number((wallPerimeterM * 2.7).toFixed(1)),
       unit: "m²",
-      unit_price: 18.5,
+      unit_price: 18.5, // [HARDCODED PLACEHOLDER: $18.50/m²]
       total: wallPerimeterM * 2.7 * 18.5,
     },
     {
       code: "TRM-CAR-06",
       category: "Finish Carpentry",
       description: "Replace 5-1/4in primed colonial baseboard & shoe moulding",
-      quantity: wallPerimeterM,
+      quantity: Number(wallPerimeterM.toFixed(1)),
       unit: "lin m",
-      unit_price: 22.0,
+      unit_price: 22.0, // [HARDCODED PLACEHOLDER: $22.00/linear m]
       total: wallPerimeterM * 22.0,
     },
   ];
@@ -121,31 +138,20 @@ export default function CostEstimateSection({
               Cost Calculation & Repair Estimate
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-1">
-              Itemized repair schedule mapped directly to 3D spatial dimensions and regional insurance rate tables.
+              Deterministic calculation engine waiting for 3D reconstruction measurements...
             </p>
           </div>
-          <span className="px-2.5 py-1 text-xs font-mono rounded border text-[var(--text-muted)] border-[var(--border-subtle)] bg-[var(--bg-surface)]">
-            processing scan
-          </span>
         </div>
 
-        <div className="rounded-2xl border p-10 text-center space-y-3 bg-[var(--bg-surface)] border-[var(--border-subtle)]">
-          <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-default)] font-mono text-xs text-[var(--accent)] animate-pulse">
-            ...
-          </div>
-          <h3 className="font-serif text-xl font-medium text-[var(--text-primary)]">
-            Spatial Processing in Progress
-          </h3>
-          <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto leading-relaxed">
-            3D reconstruction is calculating wall boundaries and damage area. You can return after processing finishes to review your certified itemized estimate.
-          </p>
-          <div className="pt-2">
-            <button
-              onClick={() => onNavigateTab?.("policy")}
-              className="btn-squish inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--border-default)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-all"
-            >
-              Proceed to Insurance Policy Documents →
-            </button>
+        <div className="rounded-2xl border p-8 sm:p-12 flex flex-col items-center justify-center text-center bg-[var(--bg-card)] border-[var(--border-subtle)] space-y-4">
+          <span className="h-8 w-8 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
+          <div className="space-y-1">
+            <h3 className="font-serif text-base font-semibold text-[var(--text-primary)]">
+              Reconstructing 3D Geometry
+            </h3>
+            <p className="text-xs text-[var(--text-muted)] max-w-md">
+              Calculating square footage, wall perimeters, and damage boundaries to populate itemized line items.
+            </p>
           </div>
         </div>
       </div>
@@ -162,37 +168,39 @@ export default function CostEstimateSection({
               Cost Calculation & Repair Estimate
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-1">
-              Itemized repair schedule mapped directly to 3D spatial dimensions and regional insurance rate tables.
+              Deterministic calculation engine mapped to physical 3D spatial scan dimensions.
             </p>
           </div>
-          <span className="px-2.5 py-1 text-xs font-mono rounded border text-[var(--text-muted)] border-[var(--border-subtle)] bg-[var(--bg-surface)]">
-            no scan loaded
-          </span>
         </div>
 
-        <div className="rounded-2xl border p-10 text-center space-y-3 bg-[var(--bg-surface)] border-[var(--border-subtle)]">
-          <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-default)] font-mono text-xs text-[var(--text-muted)]">
-            $
+        <div className="rounded-2xl border p-8 sm:p-12 flex flex-col items-center justify-center text-center bg-[var(--bg-card)] border-[var(--border-subtle)] space-y-4">
+          <svg className="w-12 h-12 text-[var(--border-strong)]" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="6" y="6" width="36" height="36" rx="4" strokeDasharray="4 3" />
+            <path d="M14 24h20M24 14v20" strokeDasharray="2 2" strokeOpacity="0.5" />
+          </svg>
+          <div className="space-y-1">
+            <h3 className="font-serif text-base font-semibold text-[var(--text-primary)]">
+              No Physical Measurements Available
+            </h3>
+            <p className="text-xs text-[var(--text-muted)] max-w-sm">
+              Please process room footage or select the interactive damage zone on Tab 1 to generate itemized costs.
+            </p>
           </div>
-          <h3 className="font-serif text-xl font-medium text-[var(--text-primary)]">
-            No Cost Estimate Generated
-          </h3>
-          <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto leading-relaxed">
-            Repair costs are calculated automatically once physical room dimensions and wall segments are reconstructed from footage.
-          </p>
-          <div className="pt-2 flex items-center justify-center gap-3">
+          {onNavigateTab && (
             <button
-              onClick={() => onNavigateTab?.("footage")}
-              className="btn-squish px-3.5 py-1.5 text-xs font-medium rounded-lg border border-[var(--border-default)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-all"
+              onClick={() => onNavigateTab("footage")}
+              className="btn-squish inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all"
+              style={{ backgroundColor: "var(--accent)" }}
             >
-              Go to Step 1: Property Footage →
+              Go to Property Footage & Floor Plan
             </button>
-          </div>
+          )}
         </div>
       </div>
     );
   }
 
+  // 3. Populated View
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -207,7 +215,7 @@ export default function CostEstimateSection({
             </span>
           </div>
           <p className="text-xs text-[var(--text-secondary)] mt-1">
-            Itemized repair schedule mapped directly to {roomAreaM2} m² measured area ({wallPerimeterM.toFixed(1)} m wall perimeter).
+            Itemized repair schedule mapped directly to {roomAreaM2} m² total room area ({wallPerimeterM.toFixed(1)} m perimeter).
           </p>
         </div>
 
@@ -225,7 +233,50 @@ export default function CostEstimateSection({
         </div>
       </div>
 
-      {/* Summary Stat Grid: 2x2 on mobile, 4 columns on large screens */}
+      {/* LIVE DAMAGE AREA SYNC BANNER */}
+      <div
+        className="p-3.5 rounded-xl border flex flex-wrap items-center justify-between gap-3 text-xs"
+        style={{
+          backgroundColor: "var(--bg-surface)",
+          borderColor: "var(--accent-subtle)",
+        }}
+      >
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <span className="h-2 w-2 rounded-full bg-[var(--accent)] animate-pulse" />
+          <span className="font-semibold text-[var(--text-primary)]">
+            Selected Damage Area:
+          </span>
+          <span className="px-2 py-0.5 rounded font-mono font-bold text-[var(--accent)] bg-[var(--bg-card)] border border-[var(--border-subtle)]">
+            {activeDamageAreaM2} m²
+          </span>
+          <span className="text-[var(--text-muted)]">
+            ({((activeDamageAreaM2 / (roomAreaM2 || 24.5)) * 100).toFixed(0)}% of room · {(activeDamageAreaM2 * 10.764).toFixed(1)} sq ft)
+          </span>
+        </div>
+
+        {/* Quick Stepper directly on Cost Tab */}
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-[var(--text-muted)]">Adjust Area:</span>
+          <button
+            type="button"
+            onClick={() => setActiveDamageAreaM2((prev) => Math.max(2.0, Number((prev - 1.0).toFixed(1))))}
+            className="px-2 py-0.5 rounded border text-xs font-mono font-bold hover:bg-[var(--bg-card)] text-[var(--text-secondary)]"
+            style={{ borderColor: "var(--border-default)" }}
+          >
+            -1 m²
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveDamageAreaM2((prev) => Math.min(roomAreaM2, Number((prev + 1.0).toFixed(1))))}
+            className="px-2 py-0.5 rounded border text-xs font-mono font-bold hover:bg-[var(--bg-card)] text-[var(--text-secondary)]"
+            style={{ borderColor: "var(--border-default)" }}
+          >
+            +1 m²
+          </button>
+        </div>
+      </div>
+
+      {/* Summary Stat Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         <div className="p-3 sm:p-4 rounded-xl border" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-default)" }}>
           <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--text-muted)]">Gross Repair Total</div>
@@ -242,7 +293,7 @@ export default function CostEstimateSection({
           <div className="text-base sm:text-xl font-semibold text-[var(--text-primary)] mt-1 font-serif truncate">
             ${overheadAndProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className="text-[10px] sm:text-[11px] text-[var(--text-secondary)] mt-0.5 truncate">Overhead markup</div>
+          <div className="text-[10px] sm:text-[11px] text-[var(--text-secondary)] mt-0.5 truncate">Overhead & profit markup</div>
         </div>
 
         <div className="p-3 sm:p-4 rounded-xl border" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-default)" }}>
@@ -250,7 +301,7 @@ export default function CostEstimateSection({
           <div className="text-base sm:text-xl font-semibold text-rose-600 dark:text-rose-400 mt-1 font-serif truncate">
             -${deductible.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className="text-[10px] sm:text-[11px] text-[var(--text-secondary)] mt-0.5 truncate">Policyholder share</div>
+          <div className="text-[10px] sm:text-[11px] text-[var(--text-secondary)] mt-0.5 truncate">From policy document</div>
         </div>
 
         <div
@@ -266,7 +317,9 @@ export default function CostEstimateSection({
           <div className="text-lg sm:text-2xl font-bold text-[var(--text-primary)] mt-1 font-serif truncate">
             ${netPayout.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className="text-[10px] sm:text-[11px] text-[var(--text-muted)] mt-0.5 truncate">Estimated payment</div>
+          <div className="text-[10px] sm:text-[11px] text-[var(--text-muted)] mt-0.5 truncate">
+            {grossTotal <= deductible ? "Below deductible threshold" : "Estimated insurer check"}
+          </div>
         </div>
       </div>
 
@@ -280,10 +333,10 @@ export default function CostEstimateSection({
       >
         <div className="space-y-1">
           <div className="text-xs font-semibold text-[var(--text-primary)]">
-            Fine-Tune Calculation Variables
+            Policy & Calculation Overrides
           </div>
           <p className="text-xs text-[var(--text-secondary)]">
-            Adjust deductible or contractor overhead & profit rates to reflect specific policy endorsements or contractor agreements.
+            Adjust deductible or contractor overhead & profit rate to reflect specific policy endorsements or contractor agreements.
           </p>
         </div>
 
@@ -298,7 +351,7 @@ export default function CostEstimateSection({
               min="0"
               value={deductible}
               onChange={(e) => setDeductible(Number(e.target.value) || 0)}
-              className="w-full sm:w-24 rounded-md border px-2.5 py-1 text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="w-full sm:w-28 rounded-md border px-2.5 py-1 text-xs font-mono font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
               style={{
                 backgroundColor: "var(--bg-card)",
                 borderColor: "var(--border-default)",
@@ -329,7 +382,7 @@ export default function CostEstimateSection({
         </div>
       </div>
 
-      {/* Itemized Rate Section (Responsive Table & Card Views) */}
+      {/* Itemized Rate Section */}
       <div
         className="rounded-2xl border overflow-hidden"
         style={{
@@ -343,7 +396,7 @@ export default function CostEstimateSection({
               Itemized Scope of Work
             </span>
             <span className="hidden sm:inline text-[11px] font-mono text-[var(--text-muted)] ml-3">
-              Rate Database: ISO / Xactimate
+              Baseline Database: Standard US Restoration Averages
             </span>
           </div>
 
@@ -368,7 +421,7 @@ export default function CostEstimateSection({
           </div>
         </div>
 
-        {/* Mobile Cards View (Visible on small screens when mobileView is cards) */}
+        {/* Mobile Cards View */}
         {mobileView === "cards" && (
           <div className="md:hidden divide-y" style={{ borderColor: "var(--border-subtle)" }}>
             {lineItems.map((item) => (
@@ -396,7 +449,7 @@ export default function CostEstimateSection({
           </div>
         )}
 
-        {/* Desktop / Optional Mobile Table View */}
+        {/* Desktop Table View */}
         <div className={`overflow-x-auto ${mobileView === "cards" ? "hidden md:block" : "block"}`}>
           <table className="w-full text-left text-xs min-w-[550px] sm:min-w-none">
             <thead>

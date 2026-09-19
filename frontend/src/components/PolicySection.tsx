@@ -6,6 +6,7 @@ interface PolicyAnalysis {
   is_covered?: boolean;
   deductible?: number;
   coverage_limit?: number;
+  missing_fields?: string[];
   peril?: string;
   reasoning?: string;
   relevant_clauses?: Array<{
@@ -34,55 +35,121 @@ export default function PolicySection({
   statusMessage,
   setStatusMessage,
   isDemo = false,
-  allowSample = false,
+  allowSample = true,
 }: PolicySectionProps) {
   const [policyUploaded, setPolicyUploaded] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<PolicyAnalysis | null>(null);
   const [causeOfLoss, setCauseOfLoss] = useState("water");
   const [damageDescription, setDamageDescription] = useState(
     "Sudden pipe burst in kitchen interior wall resulting in continuous water spread across living room hardwood flooring and adjacent drywall."
   );
+  const [customDeductible, setCustomDeductible] = useState<number | "">("");
+  const [activeClaimId, setActiveClaimId] = useState<string | null>(claimId);
+
+  // Sync external claimId if provided
+  React.useEffect(() => {
+    if (claimId) setActiveClaimId(claimId);
+  }, [claimId]);
+
+  // Helper to ensure claim exists on the backend
+  const ensureClaimId = async (): Promise<string | null> => {
+    if (activeClaimId) return activeClaimId;
+    try {
+      const res = await fetch("/claims", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          property_type: "residential",
+          damage_description: damageDescription,
+          cause_of_loss: causeOfLoss,
+        }),
+      });
+      if (res.ok) {
+        const claim = await res.json();
+        setActiveClaimId(claim.id);
+        return claim.id;
+      }
+    } catch (e) {
+      console.error("Failed to auto-create claim:", e);
+    }
+    return null;
+  };
+
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      alert("Please upload an insurance policy PDF document.");
+      return;
+    }
+
+    setIsLoading(true);
+    setUploadedFileName(file.name);
+    setStatusMessage(`Uploading and indexing "${file.name}" with section-aware RAG...`);
+
+    try {
+      const cid = await ensureClaimId();
+      if (!cid) {
+        throw new Error("Unable to initialize claim session for policy upload.");
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const uploadRes = await fetch(`/claims/${cid}/policy/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        const errJson = await uploadRes.json().catch(() => ({}));
+        throw new Error(errJson.detail || `Upload failed with status ${uploadRes.status}`);
+      }
+
+      setStatusMessage("Extracting policy terms, deductibles, and peril coverage via RAG...");
+      const analyzeRes = await fetch(`/claims/${cid}/policy/analyze`, { method: "POST" });
+      if (!analyzeRes.ok) {
+        const errJson = await analyzeRes.json().catch(() => ({}));
+        throw new Error(errJson.detail || "Policy analysis failed");
+      }
+
+      const data = await analyzeRes.json();
+      setPolicyUploaded(true);
+      setAnalysis(data.analysis);
+      onPolicyAnalyzed(data.analysis);
+      setStatusMessage(`Policy "${file.name}" indexed and analyzed successfully.`);
+    } catch (err: any) {
+      console.error("Policy upload error:", err);
+      setStatusMessage(`Notice: ${err.message || "Could not analyze custom PDF."}`);
+      alert(`Policy Analysis Notice: ${err.message || "Failed to process PDF."}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLoadSamplePolicy = async () => {
     setIsLoading(true);
     setStatusMessage("Attaching and indexing standard 22-page ISO HO-3 Policy fixture...");
 
     try {
-      // 1. Ensure claim exists
-      let cid = claimId;
-      if (!cid) {
-        const claimRes = await fetch("/claims", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            property_type: "residential",
-            damage_description: damageDescription,
-            cause_of_loss: causeOfLoss,
-          }),
-        });
-        if (claimRes.ok) {
-          const claim = await claimRes.json();
-          cid = claim.id;
-        }
-      }
-
+      const cid = await ensureClaimId();
       if (cid) {
-        // Load sample policy
         await fetch(`/claims/${cid}/policy/load-sample`, { method: "POST" });
-        // Analyze coverage
         const analyzeRes = await fetch(`/claims/${cid}/policy/analyze`, { method: "POST" });
         if (analyzeRes.ok) {
           const data = await analyzeRes.json();
           setPolicyUploaded(true);
+          setUploadedFileName("sample_ho3_policy.pdf");
           setAnalysis(data.analysis);
           onPolicyAnalyzed(data.analysis);
-          setStatusMessage("Policy indexed and coverage verified against ISO HO-3.");
+          setStatusMessage("Sample ISO HO-3 policy indexed and verified.");
           return;
         }
       }
       throw new Error("Local fallback");
     } catch (_) {
-      // Fallback demo data
+      // Offline fallback
       const mockAnalysis: PolicyAnalysis = {
         is_covered: true,
         deductible: 1000,
@@ -104,6 +171,7 @@ export default function PolicySection({
         ],
       };
       setPolicyUploaded(true);
+      setUploadedFileName("sample_ho3_policy.pdf");
       setAnalysis(mockAnalysis);
       onPolicyAnalyzed(mockAnalysis);
       setStatusMessage("Sample ISO HO-3 policy verified.");
@@ -112,46 +180,13 @@ export default function PolicySection({
     }
   };
 
-  const handleFileUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const file = files[0];
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-      alert("Please upload an insurance policy PDF document.");
-      return;
-    }
-
-    setIsLoading(true);
-    setStatusMessage(`Uploading and indexing ${file.name} with section-aware RAG...`);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      // Attempt real endpoint if claimId exists
-      if (claimId) {
-        const res = await fetch(`/claims/${claimId}/policy/upload`, {
-          method: "POST",
-          body: formData,
-        });
-        if (res.ok) {
-          const analyzeRes = await fetch(`/claims/${claimId}/policy/analyze`, { method: "POST" });
-          if (analyzeRes.ok) {
-            const data = await analyzeRes.json();
-            setPolicyUploaded(true);
-            setAnalysis(data.analysis);
-            onPolicyAnalyzed(data.analysis);
-            setStatusMessage("Uploaded policy indexed and analyzed successfully.");
-            return;
-          }
-        }
-      }
-      // Fallback
-      handleLoadSamplePolicy();
-    } catch (_) {
-      handleLoadSamplePolicy();
-    } finally {
-      setIsLoading(false);
-    }
+  const handleApplyCustomDeductible = () => {
+    if (!analysis) return;
+    const val = Number(customDeductible);
+    if (isNaN(val) || val < 0) return;
+    const updated = { ...analysis, deductible: val };
+    setAnalysis(updated);
+    onPolicyAnalyzed(updated);
   };
 
   return (
@@ -165,12 +200,12 @@ export default function PolicySection({
             </h2>
             {policyUploaded && (
               <span className="px-2 py-0.5 rounded text-[11px] font-mono border border-[var(--border-subtle)] text-[var(--text-muted)] bg-[var(--bg-surface)]">
-                {isDemo ? "sample policy (iso ho-3)" : "verified policy document"}
+                {uploadedFileName || (isDemo ? "sample policy (iso ho-3)" : "verified policy document")}
               </span>
             )}
           </div>
           <p className="text-xs text-[var(--text-secondary)] mt-1">
-            Attach your homeowner or commercial policy PDF to extract perils, deductibles, limits, and exclusions.
+            Upload your policy PDF to extract perils, deductibles, limits, and exclusions via section-aware RAG.
           </p>
         </div>
 
@@ -260,7 +295,7 @@ export default function PolicySection({
           <p className="text-xs sm:text-sm font-medium text-[var(--text-primary)]">
             {policyUploaded ? (
               <span className="font-semibold text-[var(--accent)]">
-                Policy Document Uploaded & Indexed
+                {uploadedFileName || "Policy Document"} Uploaded & Indexed
               </span>
             ) : (
               <>
@@ -268,15 +303,23 @@ export default function PolicySection({
                   htmlFor="policyPdfInput"
                   className="cursor-pointer font-semibold text-[var(--accent)] underline underline-offset-2 hover:opacity-80"
                 >
-                  Tap to upload policy PDF
+                  Click to upload your policy PDF
                 </label>
-                <span className="hidden sm:inline"> or drop file here</span>
+                <span className="hidden sm:inline"> or drag & drop here</span>
               </>
             )}
           </p>
           <p className="text-[11px] text-[var(--text-muted)] max-w-sm sm:max-w-none">
-            Standard ISO HO-3, HO-5, commercial property forms, or endorsement schedules
+            Supports ISO HO-3, HO-5, commercial policies, or declarations schedules.
           </p>
+          {policyUploaded && (
+            <label
+              htmlFor="policyPdfInput"
+              className="mt-2 text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent)] underline cursor-pointer"
+            >
+              Upload a different PDF
+            </label>
+          )}
         </div>
       </div>
 
@@ -313,24 +356,62 @@ export default function PolicySection({
             </div>
           </div>
 
+          {/* MISSING FIELD PROMPT: If deductible was not explicitly detected in PDF */}
+          {(analysis.deductible == null || analysis.missing_fields?.includes("deductible")) && (
+            <div
+              className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 space-y-2.5 text-xs"
+            >
+              <div className="flex items-center gap-2 font-semibold text-amber-700 dark:text-amber-400">
+                <span>⚠️</span> Policy Deductible Not Explicitly Found in Document
+              </div>
+              <p className="text-[var(--text-secondary)] leading-relaxed">
+                Standard policy jackets often omit individual homeowner deductible amounts (these typically appear on the separate Declarations Page). Please enter your policy deductible to calculate accurate net payouts:
+              </p>
+              <div className="flex items-center gap-2 pt-1 flex-wrap">
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1.5 font-mono text-xs font-semibold text-[var(--text-muted)]">$</span>
+                  <input
+                    type="number"
+                    placeholder="1000"
+                    value={customDeductible}
+                    onChange={(e) => setCustomDeductible(e.target.value ? Number(e.target.value) : "")}
+                    className="w-32 rounded-lg border pl-6 pr-2.5 py-1.5 text-xs font-mono font-semibold text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                    style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-default)" }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleApplyCustomDeductible}
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white transition-all shadow-sm"
+                  style={{ backgroundColor: "var(--accent)" }}
+                >
+                  Set Deductible
+                </button>
+                <span className="text-[11px] text-[var(--text-muted)]">
+                  (Common defaults: $1,000 or $2,500)
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div className="p-3 rounded-xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
               <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--text-muted)]">Policy Deductible</div>
-              <div className="text-base font-semibold text-[var(--text-primary)] mt-1">
-                ${(analysis.deductible ?? 1000).toLocaleString()}
+              <div className="text-base font-semibold text-[var(--text-primary)] mt-1 font-mono">
+                {analysis.deductible != null ? `$${analysis.deductible.toLocaleString()}` : "Not Specified"}
               </div>
             </div>
             <div className="p-3 rounded-xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
               <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--text-muted)]">Dwelling Limit (Coverage A)</div>
-              <div className="text-base font-semibold text-[var(--text-primary)] mt-1">
+              <div className="text-base font-semibold text-[var(--text-primary)] mt-1 font-mono">
                 ${(analysis.coverage_limit ?? 350000).toLocaleString()}
               </div>
             </div>
             <div className="col-span-2 sm:col-span-1 p-3 rounded-xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
               <div className="text-[10px] uppercase font-mono tracking-wider text-[var(--text-muted)]">Applicable Peril</div>
               <div className="text-xs font-medium text-[var(--text-primary)] mt-1 truncate">
-                Internal Plumbing Discharge
+                {causeOfLoss === "water" ? "Internal Plumbing Discharge" : causeOfLoss}
               </div>
             </div>
           </div>

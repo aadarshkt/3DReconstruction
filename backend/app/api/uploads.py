@@ -274,8 +274,16 @@ async def _assemble_chunks(job_id: str, filename: str, tmp_dir: Path, total: int
 
 
 # ── Start: enqueue Celery task ─────────────────────────────────────────────────
+class StartJobRequest(BaseModel):
+    scale_reference_m: Optional[float] = None
+
+
 @router.post("/{job_id}/start", response_model=StartJobResponse)
-async def start_job(job_id: str, db: AsyncSession = Depends(get_db)):
+async def start_job(
+    job_id: str,
+    body: Optional[StartJobRequest] = None,
+    db: AsyncSession = Depends(get_db),
+):
     """
     Enqueue the pipeline processing task.
 
@@ -290,13 +298,16 @@ async def start_job(job_id: str, db: AsyncSession = Depends(get_db)):
             detail=f"Job is in state {job.status!r} — can only start from 'uploading' or 'created'.",
         )
 
+    if body and body.scale_reference_m is not None and body.scale_reference_m > 0:
+        job.scale_reference_m = body.scale_reference_m
+
     # Enqueue Celery task
     task = run_pipeline.delay(job_id)
     job.celery_task_id = task.id
     job.status = JobStatus.queued
     await db.commit()
 
-    log.info("job_queued", job_id=job_id, celery_task_id=task.id)
+    log.info("job_queued", job_id=job_id, celery_task_id=task.id, scale_reference_m=job.scale_reference_m)
     return StartJobResponse(
         job_id=job_id,
         celery_task_id=task.id,

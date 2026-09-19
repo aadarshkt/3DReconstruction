@@ -70,6 +70,7 @@ class PolicyAnalysis:
     exclusions_found: list[dict[str, Any]] = field(default_factory=list)
     deductible: Optional[float] = None
     coverage_limit: Optional[float] = None
+    missing_fields: list[str] = field(default_factory=list)
     duties_after_loss: list[str] = field(default_factory=list)
     reasoning: str = ""
     recommendations: list[str] = field(default_factory=list)
@@ -428,14 +429,23 @@ class PolicyRAGEngine:
 
         try:
             parsed = json.loads(raw_response)
+            deductible_val = parsed.get("deductible")
+            limit_val = parsed.get("coverage_limit")
+            missing = []
+            if deductible_val is None:
+                missing.append("deductible")
+            if limit_val is None:
+                missing.append("coverage_limit")
+
             return PolicyAnalysis(
                 is_covered=parsed.get("is_covered"),
                 confidence=parsed.get("confidence", "medium"),
                 relevant_clauses=parsed.get("relevant_clauses", []),
                 page_references=parsed.get("page_references", []),
                 exclusions_found=parsed.get("exclusions_found", []),
-                deductible=parsed.get("deductible"),
-                coverage_limit=parsed.get("coverage_limit"),
+                deductible=deductible_val,
+                coverage_limit=limit_val,
+                missing_fields=missing,
                 duties_after_loss=parsed.get("duties_after_loss", []),
                 reasoning=parsed.get("reasoning", ""),
                 recommendations=parsed.get("recommendations", []),
