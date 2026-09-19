@@ -230,7 +230,7 @@ export default function UploadSection({
           tier: result.tier === "hybrid" ? "Hybrid (Photos/Video + LiDAR)" : result.tier,
           walls: result.walls || [],
           svgContent: svgText,
-          plyUrl: `/jobs/${activeJobId}/files/point_cloud.ply`,
+          plyUrl: result.files?.point_cloud_ply || `/jobs/${activeJobId}/files/point_cloud.ply`,
           damageAreaM2: result.damage_area_m2,
         };
         setScanData(parsedScan);

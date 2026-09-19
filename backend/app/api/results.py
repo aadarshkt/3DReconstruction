@@ -25,6 +25,8 @@ router = APIRouter()
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
 class ResultFilesSchema(BaseModel):
+    model_config = {"extra": "allow"}
+
     floor_plan_dxf: str | None = None
     floor_plan_svg: str | None = None
     point_cloud_ply: str | None = None
@@ -32,29 +34,40 @@ class ResultFilesSchema(BaseModel):
 
 
 class WallSchema(BaseModel):
-    id: int
-    length_m: float
-    start: list[float]
-    end: list[float]
-    has_opening: bool
-    opening_type: str | None   # "door" | "window" | None
+    model_config = {"extra": "allow"}
+
+    id: int | None = None
+    length_m: float | None = None
+    start: list[float] | None = None
+    end: list[float] | None = None
+    has_opening: bool = False
+    opening_type: str | None = None   # "door" | "window" | None
+    openings: list[dict] | None = None
 
 
 class ErrorEstimateSchema(BaseModel):
-    method: str
-    expected_wall_error_cm: float
+    model_config = {"extra": "allow"}
+
+    method: str | None = None
+    expected_wall_error_cm: float | None = None
 
 
 class JobResultResponse(BaseModel):
+    model_config = {"extra": "allow"}
+
     job_id: str
     status: JobStatus
     tier: str
-    scale_confidence: str | None
-    room_area_m2: float | None
-    wall_count: int | None
-    walls: list[WallSchema]
-    error_estimate: ErrorEstimateSchema | None
-    files: ResultFilesSchema
+    scale_confidence: str | None = None
+    room_area_m2: float | None = None
+    wall_count: int | None = None
+    walls: list[WallSchema] = []
+    error_estimate: ErrorEstimateSchema | None = None
+    files: ResultFilesSchema = ResultFilesSchema()
+    scale_factor: float | None = None
+    scale_method: str | None = None
+    damage_area_m2: float | None = None
+    diagnostics: dict | None = None
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
@@ -85,16 +98,30 @@ async def get_results(job_id: str, db: AsyncSession = Depends(get_db)):
         if v
     }
 
+    # Ensure point_cloud_ply is populated if available on disk
+    if "point_cloud_ply" not in files_urls or not files_urls["point_cloud_ply"]:
+        results_dir = get_results_dir(job_id)
+        if (results_dir / "scan_metric.ply").exists():
+            files_urls["point_cloud_ply"] = f"/jobs/{job_id}/files/scan_metric.ply"
+        elif (results_dir / "point_cloud.ply").exists():
+            files_urls["point_cloud_ply"] = f"/jobs/{job_id}/files/point_cloud.ply"
+
+    tier_str = job.tier.value if hasattr(job.tier, "value") else str(job.tier)
+
     return JobResultResponse(
         job_id=job_id,
         status=job.status,
-        tier=str(job.tier),
+        tier=tier_str,
         scale_confidence=payload.get("scale_confidence"),
-        room_area_m2=job.room_area_m2,
-        wall_count=job.wall_count,
-        walls=[WallSchema(**w) for w in walls_raw],
+        room_area_m2=job.room_area_m2 if job.room_area_m2 is not None else payload.get("room_area_m2"),
+        wall_count=job.wall_count if job.wall_count is not None else payload.get("wall_count"),
+        walls=[WallSchema(**w) for w in walls_raw] if walls_raw else [],
         error_estimate=ErrorEstimateSchema(**error_raw) if error_raw else None,
         files=ResultFilesSchema(**files_urls),
+        scale_factor=payload.get("scale_factor"),
+        scale_method=payload.get("scale_method"),
+        damage_area_m2=payload.get("damage_area_m2"),
+        diagnostics=payload.get("diagnostics"),
     )
 
 
@@ -113,6 +140,13 @@ async def download_file(job_id: str, filename: str, db: AsyncSession = Depends(g
 
     if not str(target).startswith(str(results_dir.resolve())):
         raise HTTPException(status_code=400, detail="Invalid filename.")
+
+    # Support aliases: point_cloud.ply <-> scan_metric.ply
+    if not target.exists():
+        if filename == "point_cloud.ply" and (results_dir / "scan_metric.ply").exists():
+            target = results_dir / "scan_metric.ply"
+        elif filename == "scan_metric.ply" and (results_dir / "point_cloud.ply").exists():
+            target = results_dir / "point_cloud.ply"
 
     if not target.exists():
         raise HTTPException(status_code=404, detail=f"File {filename!r} not found for job {job_id!r}.")
