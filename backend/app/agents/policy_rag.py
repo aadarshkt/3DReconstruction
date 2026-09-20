@@ -90,7 +90,7 @@ class PolicyRAGEngine:
         persist_dir: Optional[Path] = None,
         llm_client: Optional[LLMClient] = None,
     ):
-        self.persist_dir = persist_dir or settings.CHROMA_PERSIST_DIR
+        self.persist_dir = persist_dir or (settings.DATA_DIR / "chromadb" if getattr(settings, "DATA_DIR", None) else settings.CHROMA_PERSIST_DIR)
         self.persist_dir.mkdir(parents=True, exist_ok=True)
         if chromadb is not None and ChromaSettings is not None:
             self.client = chromadb.PersistentClient(

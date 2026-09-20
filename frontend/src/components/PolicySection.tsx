@@ -84,11 +84,16 @@ export default function PolicySection({
         const claim = await res.json();
         setActiveClaimId(claim.id);
         return claim.id;
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        const msg = errJson.detail || `Server returned status ${res.status} during claim initialization.`;
+        console.error("Failed to auto-create claim:", res.status, errJson);
+        throw new Error(msg);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to auto-create claim:", e);
+      throw e;
     }
-    return null;
   };
 
   const handleFileUpload = async (files: FileList | null) => {

@@ -49,6 +49,19 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE claims ADD COLUMN IF NOT EXISTS policy_analysis JSON;",
             "ALTER TABLE claims ADD COLUMN IF NOT EXISTS cost_estimate JSON;",
             "ALTER TABLE claims ADD COLUMN IF NOT EXISTS total_estimated_cost FLOAT;",
+            # Legacy column nullability fixes for databases initialized with prior schemas
+            "ALTER TABLE claims ALTER COLUMN policyholder_name DROP NOT NULL;",
+            "ALTER TABLE claims ALTER COLUMN policy_number DROP NOT NULL;",
+            "ALTER TABLE claims ALTER COLUMN property_address DROP NOT NULL;",
+            "ALTER TABLE claims ALTER COLUMN incident_type DROP NOT NULL;",
+            "ALTER TABLE claims ALTER COLUMN progress_pct DROP NOT NULL;",
+            "ALTER TABLE claims ALTER COLUMN progress_pct SET DEFAULT 0;",
+            # Missing claimstatus enum values for existing postgres databases
+            "ALTER TYPE claimstatus ADD VALUE IF NOT EXISTS 'policy_uploading';",
+            "ALTER TYPE claimstatus ADD VALUE IF NOT EXISTS 'policy_indexed';",
+            "ALTER TYPE claimstatus ADD VALUE IF NOT EXISTS 'analyzing_policy';",
+            "ALTER TYPE claimstatus ADD VALUE IF NOT EXISTS 'estimating_costs';",
+            "ALTER TYPE claimstatus ADD VALUE IF NOT EXISTS 'complete';",
         ]
         for patch in schema_patches:
             try:
