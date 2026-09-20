@@ -41,10 +41,10 @@ const getStageLabel = (stage: string) => STAGE_LABELS[stage] || stage || "Proces
 interface UploadSectionProps {
   jobId: string | null;
   onJobLoaded: (jobData: any, isDemo?: boolean) => void;
-  isLoading: boolean;
-  setIsLoading: (val: boolean) => void;
-  statusMessage: string;
-  setStatusMessage: (msg: string) => void;
+  isLoading?: boolean;
+  setIsLoading?: (val: boolean) => void;
+  statusMessage?: string;
+  setStatusMessage?: (msg: string) => void;
   isProcessing?: boolean;
   setIsProcessing?: (val: boolean) => void;
   isDemo?: boolean;
@@ -56,10 +56,10 @@ interface UploadSectionProps {
 export default function UploadSection({
   jobId,
   onJobLoaded,
-  isLoading,
-  setIsLoading,
-  statusMessage,
-  setStatusMessage,
+  isLoading: propLoading,
+  setIsLoading: propSetIsLoading,
+  statusMessage: propStatusMessage,
+  setStatusMessage: propSetStatusMessage,
   isProcessing = false,
   setIsProcessing,
   isDemo = false,
@@ -67,6 +67,21 @@ export default function UploadSection({
   onNavigateTab,
   allowSample = false,
 }: UploadSectionProps) {
+  const [internalLoading, setInternalLoading] = useState(false);
+  const [internalStatusMessage, setInternalStatusMessage] = useState("");
+
+  const isLoading = propLoading !== undefined ? propLoading : internalLoading;
+  const setIsLoading = (val: boolean) => {
+    setInternalLoading(val);
+    propSetIsLoading?.(val);
+  };
+
+  const statusMessage = propStatusMessage !== undefined ? propStatusMessage : internalStatusMessage;
+  const setStatusMessage = (msg: string) => {
+    setInternalStatusMessage(msg);
+    propSetStatusMessage?.(msg);
+  };
+
   const [activeMediaTab, setActiveMediaTab] = useState<"photos" | "video" | "lidar">("photos");
   const [dragOver, setDragOver] = useState(false);
   const [progressPct, setProgressPct] = useState(0);

@@ -16,16 +16,20 @@ export default function GuidedTourPage() {
   const [isDemoMode, setIsDemoMode] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [policyDeductible, setPolicyDeductible] = useState<number>(1000);
-  const [isLoading, setIsLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("");
+  const [footageLoading, setFootageLoading] = useState(false);
+  const [footageStatusMessage, setFootageStatusMessage] = useState("");
+  const [policyLoading, setPolicyLoading] = useState(false);
+  const [policyStatusMessage, setPolicyStatusMessage] = useState("");
   const [svgContent, setSvgContent] = useState<string | null>(null);
+
+  const isLoading = footageLoading || policyLoading;
 
   const driverRef = useRef<any>(null);
 
   // Load sample dataset from the dedicated tour API (/api/v1/tour)
   const handleLoadSample = async () => {
-    setIsLoading(true);
-    setStatusMessage("Fetching verified tour dataset from Tour Microservice...");
+    setFootageLoading(true);
+    setFootageStatusMessage("Fetching verified tour dataset from Tour Microservice...");
     try {
       // 1. Dedicated sample claim endpoint
       const res = await fetch("/api/v1/tour/sample-claim");
@@ -52,7 +56,7 @@ export default function GuidedTourPage() {
       }
 
       setIsDemoMode(true);
-      setStatusMessage("✓ Verified 24.5 m² sample scan & ISO HO-3 policy loaded from tour service.");
+      setFootageStatusMessage("✓ Verified 24.5 m² sample scan & ISO HO-3 policy loaded from tour service.");
     } catch {
       // Fallback in case of network variance
       setJobData({
@@ -65,9 +69,9 @@ export default function GuidedTourPage() {
         plyUrl: "/api/v1/tour/artifacts/point_cloud.ply",
       });
       setIsDemoMode(true);
-      setStatusMessage("✓ Sample tour dataset active.");
+      setFootageStatusMessage("✓ Sample tour dataset active.");
     } finally {
-      setIsLoading(false);
+      setFootageLoading(false);
     }
   };
 
@@ -294,10 +298,10 @@ export default function GuidedTourPage() {
                   if (data.job_id) setJobId(data.job_id);
                   setJobData(data);
                 }}
-                isLoading={isLoading}
-                setIsLoading={setIsLoading}
-                statusMessage={statusMessage}
-                setStatusMessage={setStatusMessage}
+                isLoading={footageLoading}
+                setIsLoading={setFootageLoading}
+                statusMessage={footageStatusMessage}
+                setStatusMessage={setFootageStatusMessage}
                 isProcessing={isProcessing}
                 setIsProcessing={setIsProcessing}
                 isDemo={isDemoMode}
@@ -311,10 +315,10 @@ export default function GuidedTourPage() {
               <PolicySection
                 claimId={claimId}
                 onPolicyAnalyzed={handlePolicyAnalyzed}
-                isLoading={isLoading}
-                setIsLoading={setIsLoading}
-                statusMessage={statusMessage}
-                setStatusMessage={setStatusMessage}
+                isLoading={policyLoading}
+                setIsLoading={setPolicyLoading}
+                statusMessage={policyStatusMessage}
+                setStatusMessage={setPolicyStatusMessage}
                 isDemo={isDemoMode}
                 allowSample={true}
               />

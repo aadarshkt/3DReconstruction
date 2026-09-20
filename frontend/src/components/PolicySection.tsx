@@ -19,10 +19,10 @@ interface PolicyAnalysis {
 interface PolicySectionProps {
   claimId: string | null;
   onPolicyAnalyzed: (analysis: PolicyAnalysis) => void;
-  isLoading: boolean;
-  setIsLoading: (val: boolean) => void;
-  statusMessage: string;
-  setStatusMessage: (msg: string) => void;
+  isLoading?: boolean;
+  setIsLoading?: (val: boolean) => void;
+  statusMessage?: string;
+  setStatusMessage?: (msg: string) => void;
   isDemo?: boolean;
   allowSample?: boolean;
 }
@@ -30,13 +30,28 @@ interface PolicySectionProps {
 export default function PolicySection({
   claimId,
   onPolicyAnalyzed,
-  isLoading,
-  setIsLoading,
-  statusMessage,
-  setStatusMessage,
+  isLoading: propLoading,
+  setIsLoading: propSetIsLoading,
+  statusMessage: propStatusMessage,
+  setStatusMessage: propSetStatusMessage,
   isDemo = false,
   allowSample = true,
 }: PolicySectionProps) {
+  const [internalLoading, setInternalLoading] = useState(false);
+  const [internalStatusMessage, setInternalStatusMessage] = useState("");
+
+  const isLoading = propLoading !== undefined ? propLoading : internalLoading;
+  const setIsLoading = (val: boolean) => {
+    setInternalLoading(val);
+    propSetIsLoading?.(val);
+  };
+
+  const statusMessage = propStatusMessage !== undefined ? propStatusMessage : internalStatusMessage;
+  const setStatusMessage = (msg: string) => {
+    setInternalStatusMessage(msg);
+    propSetStatusMessage?.(msg);
+  };
+
   const [policyUploaded, setPolicyUploaded] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<PolicyAnalysis | null>(null);
@@ -319,6 +334,19 @@ export default function PolicySection({
             >
               Upload a different PDF
             </label>
+          )}
+
+          {isLoading && (
+            <div className="flex items-center justify-center gap-2 mt-2 text-xs font-mono text-[var(--accent)]">
+              <span className="h-3.5 w-3.5 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
+              <span>Analyzing policy terms...</span>
+            </div>
+          )}
+
+          {statusMessage && (
+            <div className="mt-3 text-xs font-mono text-[var(--accent)] text-center">
+              {statusMessage}
+            </div>
           )}
         </div>
       </div>

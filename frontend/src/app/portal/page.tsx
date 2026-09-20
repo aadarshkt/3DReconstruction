@@ -20,8 +20,10 @@ export default function UserPortalPage() {
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [policyDeductible, setPolicyDeductible] = useState<number>(1000);
-  const [isLoading, setIsLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("");
+  const [footageLoading, setFootageLoading] = useState(false);
+  const [footageStatusMessage, setFootageStatusMessage] = useState("");
+  const [policyLoading, setPolicyLoading] = useState(false);
+  const [policyStatusMessage, setPolicyStatusMessage] = useState("");
 
   // Client-side authentication guard
   useEffect(() => {
@@ -72,7 +74,8 @@ export default function UserPortalPage() {
     setJobData(null);
     setIsDemoMode(false);
     setIsProcessing(false);
-    setStatusMessage("");
+    setFootageStatusMessage("");
+    setPolicyStatusMessage("");
     if (typeof window !== "undefined") {
       localStorage.removeItem("claimspace_active_job_id");
       localStorage.removeItem("claimspace_active_claim_id");
@@ -199,10 +202,10 @@ export default function UserPortalPage() {
               <UploadSection
                 jobId={jobId}
                 onJobLoaded={handleJobLoaded}
-                isLoading={isLoading}
-                setIsLoading={setIsLoading}
-                statusMessage={statusMessage}
-                setStatusMessage={setStatusMessage}
+                isLoading={footageLoading}
+                setIsLoading={setFootageLoading}
+                statusMessage={footageStatusMessage}
+                setStatusMessage={setFootageStatusMessage}
                 isProcessing={isProcessing}
                 setIsProcessing={setIsProcessing}
                 isDemo={isDemoMode}
@@ -215,10 +218,10 @@ export default function UserPortalPage() {
               <PolicySection
                 claimId={claimId}
                 onPolicyAnalyzed={handlePolicyAnalyzed}
-                isLoading={isLoading}
-                setIsLoading={setIsLoading}
-                statusMessage={statusMessage}
-                setStatusMessage={setStatusMessage}
+                isLoading={policyLoading}
+                setIsLoading={setPolicyLoading}
+                statusMessage={policyStatusMessage}
+                setStatusMessage={setPolicyStatusMessage}
                 isDemo={isDemoMode}
               />
             )}
