@@ -20,6 +20,24 @@ interface ScanData {
   damageAreaM2?: number;
 }
 
+const STAGE_LABELS: Record<string, string> = {
+  created: "Job initialized",
+  uploading: "Uploading footage",
+  queued: "Queued for reconstruction",
+  extracting_frames: "Extracting video frames",
+  colmap_sfm: "Sparse 3D reconstruction (SfM)",
+  colmap_mvs: "Dense point cloud generation (MVS)",
+  scale_anchoring: "Calibrating metric scale",
+  lidar_converting: "Processing LiDAR geometry",
+  plane_extraction: "Detecting walls & surfaces",
+  vectorizing: "Generating 2D architectural drawings",
+  exporting: "Finalizing 3D models & assets",
+  complete: "Reconstruction complete",
+  failed: "Reconstruction failed",
+};
+
+const getStageLabel = (stage: string) => STAGE_LABELS[stage] || stage || "Processing";
+
 interface UploadSectionProps {
   jobId: string | null;
   onJobLoaded: (jobData: any, isDemo?: boolean) => void;
@@ -54,7 +72,9 @@ export default function UploadSection({
   const [progressPct, setProgressPct] = useState(0);
   const [progressStage, setProgressStage] = useState("");
   const wsRef = useRef<WebSocket | null>(null);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const scaleSectionRef = useRef<HTMLDivElement | null>(null);
+  const viewerSectionRef = useRef<HTMLDivElement | null>(null);
 
   // Scale Reference Option A state
   const [scaleRefPreset, setScaleRefPreset] = useState<"door" | "ceiling" | "paper" | "custom" | "none">("door");
@@ -62,6 +82,7 @@ export default function UploadSection({
   const [scaleUnit, setScaleUnit] = useState<"m" | "ft">("m");
   const [uploadedJob, setUploadedJob] = useState<{ job_id: string; tier: string; count: number } | null>(null);
   const [isStartingJob, setIsStartingJob] = useState<boolean>(false);
+  const [isScaleSubmitted, setIsScaleSubmitted] = useState<boolean>(false);
 
   const handlePresetSelect = (preset: "door" | "ceiling" | "paper" | "custom" | "none") => {
     setScaleRefPreset(preset);
@@ -132,18 +153,95 @@ export default function UploadSection({
     }
   }, [jobData, isDemo]);
 
-  // Clean up WebSocket on unmount
+  // Clean up WebSocket and polling interval on unmount
   useEffect(() => {
     return () => {
       if (wsRef.current) {
         wsRef.current.close();
       }
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
     };
   }, []);
+
+  // Rehydrate in-flight or completed reconstruction job on mount / browser refresh
+  useEffect(() => {
+    if (isDemo) return;
+
+    let targetJobId = jobId;
+    if (!targetJobId && typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      targetJobId = urlParams.get("job_id") || localStorage.getItem("claimspace_active_job_id");
+    }
+
+    if (!targetJobId) return;
+
+    // If scanData is already populated for this job and not currently processing, no need to reload
+    if (scanData && !isProcessing) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const restoreActiveJob = async () => {
+      try {
+        const res = await fetch(`/jobs/${targetJobId}`);
+        if (!res.ok) {
+          if (res.status === 404 && typeof window !== "undefined") {
+            localStorage.removeItem("claimspace_active_job_id");
+          }
+          return;
+        }
+
+        const job = await res.json();
+        if (isCancelled) return;
+
+        if (job.status === "complete") {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("claimspace_active_job_id");
+          }
+          await fetchJobResults(targetJobId!);
+        } else if (job.status === "failed") {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("claimspace_active_job_id");
+          }
+          setIsProcessing?.(false);
+          setIsLoading(false);
+          setStatusMessage(`Reconstruction error: ${job.error_message || "Processing failed"}`);
+        } else {
+          // In-flight pipeline (queued, extracting_frames, colmap_sfm, etc.)
+          setIsLoading(true);
+          setIsProcessing?.(true);
+          setProgressPct(job.progress_pct || 10);
+          setProgressStage(job.status || "processing");
+          setStatusMessage(
+            `Resuming 3D reconstruction (${getStageLabel(job.status)} · ${job.progress_pct || 10}%)...`
+          );
+          onJobLoaded({ job_id: targetJobId, tier: job.tier }, false);
+          connectProgressWebSocket(targetJobId!);
+        }
+      } catch (err) {
+        console.error("Failed to restore pipeline status:", err);
+      }
+    };
+
+    restoreActiveJob();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [jobId, isDemo]);
 
   const handleSeedDemo = async () => {
     setIsLoading(true);
     setStatusMessage("Loading sample 3D scan and room geometry...");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("claimspace_active_job_id");
+      const url = new URL(window.location.href);
+      url.searchParams.delete("job_id");
+      window.history.replaceState({}, "", url.toString());
+    }
     try {
       const res = await fetch("/claims/seed-demo", { method: "POST" });
       if (!res.ok) throw new Error(await res.text());
@@ -199,6 +297,14 @@ export default function UploadSection({
 
   const connectProgressWebSocket = (activeJobId: string) => {
     try {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const host = window.location.host;
       const ws = new WebSocket(`${protocol}//${host}/jobs/${activeJobId}/ws`);
@@ -208,12 +314,21 @@ export default function UploadSection({
         try {
           const msg = JSON.parse(event.data);
           if (msg.pct != null) setProgressPct(msg.pct);
-          if (msg.stage) setProgressStage(msg.stage);
+          if (msg.stage) {
+            setProgressStage(msg.stage);
+            setStatusMessage(`Processing 3D reconstruction (${getStageLabel(msg.stage)} · ${msg.pct ?? progressPct}%)...`);
+          }
 
           if (msg.stage === "complete" || msg.pct === 100) {
+            if (typeof window !== "undefined") {
+              localStorage.removeItem("claimspace_active_job_id");
+            }
             ws.close();
             await fetchJobResults(activeJobId);
           } else if (msg.stage === "failed") {
+            if (typeof window !== "undefined") {
+              localStorage.removeItem("claimspace_active_job_id");
+            }
             ws.close();
             setIsProcessing?.(false);
             setIsLoading(false);
@@ -231,22 +346,41 @@ export default function UploadSection({
   };
 
   const pollJobStatus = (activeJobId: string) => {
-    const interval = setInterval(async () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+    }
+
+    pollIntervalRef.current = setInterval(async () => {
       try {
         const res = await fetch(`/jobs/${activeJobId}`);
         if (!res.ok) return;
         const job = await res.json();
         setProgressPct(job.progress_pct || 0);
         setProgressStage(job.status || "");
+        if (job.status) {
+          setStatusMessage(`Processing 3D reconstruction (${getStageLabel(job.status)} · ${job.progress_pct || 0}%)...`);
+        }
 
         if (job.status === "complete") {
-          clearInterval(interval);
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("claimspace_active_job_id");
+          }
           await fetchJobResults(activeJobId);
         } else if (job.status === "failed") {
-          clearInterval(interval);
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("claimspace_active_job_id");
+          }
           setIsProcessing?.(false);
           setIsLoading(false);
-          setStatusMessage("Reconstruction encountered an issue.");
+          setStatusMessage(`Reconstruction error: ${job.error_message || "Processing failed"}`);
         }
       } catch (_) {}
     }, 3000);
@@ -313,6 +447,7 @@ export default function UploadSection({
       }
       const job = await res.json();
       setUploadedJob(job);
+      setIsScaleSubmitted(false);
       setIsLoading(false);
       setProgressPct(100);
 
@@ -339,12 +474,19 @@ export default function UploadSection({
     const jId = targetJobId || uploadedJob?.job_id;
     if (!jId) return;
 
+    // Immediately dismiss scale component
+    setIsScaleSubmitted(true);
     setIsStartingJob(true);
     setIsLoading(true);
     setIsProcessing?.(true);
     setProgressPct(5);
     setProgressStage("queued");
     setStatusMessage("Enqueuing 3D spatial reconstruction...");
+
+    // Smoothly scroll down to viewer section so viewer and status progress are visible
+    setTimeout(() => {
+      viewerSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
 
     try {
       const scaleToUse = overrideScale !== undefined
@@ -360,6 +502,13 @@ export default function UploadSection({
       if (!res.ok) {
         const errText = await res.text();
         throw new Error(errText || "Failed to start pipeline");
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("claimspace_active_job_id", jId);
+        const url = new URL(window.location.href);
+        url.searchParams.set("job_id", jId);
+        window.history.replaceState({}, "", url.toString());
       }
 
       setStatusMessage(`Processing 3D spatial reconstruction (${scaleToUse ? `scale ~${scaleToUse}m` : "unscaled SfM"})...`);
@@ -404,31 +553,22 @@ export default function UploadSection({
         )}
       </div>
 
-      {/* Progress & Next Step Guidance Prompt */}
-      {(isLoading || isProcessing) && (
+      {/* Upload Progress Prompt (during initial file upload) */}
+      {isLoading && progressStage === "uploading" && (
         <div className="p-4 rounded-xl border space-y-3" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="space-y-0.5">
               <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-primary)] flex-wrap">
                 <span className="h-2 w-2 rounded-full bg-[var(--accent)] animate-pulse" />
-                <span>Processing 3D spatial reconstruction</span>
+                <span>Uploading property footage...</span>
                 <span className="font-mono text-[11px] text-[var(--text-muted)]">
-                  ({progressStage || "processing"} · {progressPct}%)
+                  ({progressPct}%)
                 </span>
               </div>
               <p className="text-[11px] text-[var(--text-muted)]">
-                While geometry and measurements are being extracted, you can proceed to upload your insurance policy document.
+                {statusMessage || "Preparing footage files for photogrammetry and spatial processing."}
               </p>
             </div>
-
-            {onNavigateTab && (
-              <button
-                onClick={() => onNavigateTab("policy")}
-                className="btn-squish w-full sm:w-auto shrink-0 px-3 py-2 text-xs font-medium rounded-lg border border-[var(--border-default)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-all text-center"
-              >
-                Proceed to Policy Documents →
-              </button>
-            )}
           </div>
 
           {/* Progress Bar */}
@@ -504,12 +644,29 @@ export default function UploadSection({
                 <p className="text-xs sm:text-sm font-semibold text-[var(--text-primary)]">
                   {uploadedJob.count} photo(s) uploaded successfully
                 </p>
-                <p className="text-[11px] text-[var(--text-muted)]">
-                  Confirm scale reference below to start reconstruction, or{" "}
-                  <label htmlFor="mediaUploadInput" className="cursor-pointer text-[var(--accent)] underline font-medium">
-                    choose different photos
-                  </label>
-                </p>
+                {isScaleSubmitted ? (
+                  <div className="flex flex-col items-center gap-1">
+                    <p className="text-[11px] text-[var(--accent)] font-medium">
+                      Scale reference applied: {effectiveScaleM ? `${effectiveScaleM}m (${scaleRefPreset})` : "Relative / Unscaled"}
+                    </p>
+                    {!isProcessing && !isLoading && (
+                      <button
+                        type="button"
+                        onClick={() => setIsScaleSubmitted(false)}
+                        className="text-[10px] text-[var(--text-muted)] underline hover:text-[var(--text-primary)] transition-colors"
+                      >
+                        Adjust scale reference
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-[var(--text-muted)]">
+                    Confirm scale reference below to start reconstruction, or{" "}
+                    <label htmlFor="mediaUploadInput" className="cursor-pointer text-[var(--accent)] underline font-medium">
+                      choose different photos
+                    </label>
+                  </p>
+                )}
               </div>
             ) : (
               <>
@@ -547,8 +704,8 @@ export default function UploadSection({
           )}
         </div>
 
-        {/* Simplified Scale Reference Card (Revealed below dropzone after photo upload) */}
-        {uploadedJob && uploadedJob.tier !== "lidar" && !isProcessing && (
+        {/* Simplified Scale Reference Card (Revealed below dropzone after photo upload until reconstruction starts) */}
+        {uploadedJob && uploadedJob.tier !== "lidar" && !isScaleSubmitted && !isProcessing && (
           <div
             ref={scaleSectionRef}
             id="scale-reference-section"
@@ -681,15 +838,81 @@ export default function UploadSection({
       </div>
 
       {/* SPATIAL VIEWER: Renders clean empty state when no scanData is active */}
-      <div id="tour-spatial-viewer" className="space-y-2 pt-6 border-t" style={{ borderColor: "var(--border-subtle)" }}>
+      <div
+        ref={viewerSectionRef}
+        id="tour-spatial-viewer"
+        className="space-y-3 pt-6 border-t scroll-mt-6"
+        style={{ borderColor: "var(--border-subtle)" }}
+      >
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <span className="text-xs font-mono uppercase tracking-wider text-[var(--accent)] font-semibold">
-            Interactive Visual Output
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono uppercase tracking-wider text-[var(--accent)] font-semibold">
+              Interactive Visual Output
+            </span>
+            {(isLoading || isProcessing) && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                {progressStage || "processing"} · {progressPct}%
+              </span>
+            )}
+          </div>
           <span className="text-[11px] font-mono text-[var(--text-muted)]">
-            {scanData ? `active dataset: ${isDemo ? "sample preview" : scanData.tier}` : "no active scan"}
+            {scanData
+              ? `active dataset: ${isDemo ? "sample preview" : scanData.tier}`
+              : isProcessing || isLoading
+              ? "reconstruction in progress..."
+              : "no active scan"}
           </span>
         </div>
+
+        {/* Live Upload & Reconstruction Status Progress Bar */}
+        {(isLoading || isProcessing) && (
+          <div
+            className="p-4 rounded-xl border space-y-3 transition-all"
+            style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--accent)" }}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-primary)] flex-wrap">
+                  <span className="h-2 w-2 rounded-full bg-[var(--accent)] animate-pulse" />
+                  <span>
+                    {progressStage === "uploading"
+                      ? "Uploading property footage..."
+                      : "Processing 3D spatial reconstruction"}
+                  </span>
+                  <span className="font-mono text-[11px] text-[var(--text-muted)]">
+                    ({progressStage || "processing"} · {progressPct}%)
+                  </span>
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  {statusMessage ||
+                    "While geometry and measurements are being extracted, you can proceed to upload your insurance policy document."}
+                </p>
+              </div>
+
+              {onNavigateTab && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateTab("policy")}
+                  className="btn-squish w-full sm:w-auto shrink-0 px-3 py-2 text-xs font-medium rounded-lg border border-[var(--border-default)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-all text-center"
+                >
+                  Proceed to Policy Documents →
+                </button>
+              )}
+            </div>
+
+            {/* Progress Bar */}
+            <div
+              className="w-full bg-[var(--bg-card)] rounded-full h-2 overflow-hidden border"
+              style={{ borderColor: "var(--border-subtle)" }}
+            >
+              <div
+                className="h-full bg-[var(--accent)] transition-all duration-300"
+                style={{ width: `${Math.max(5, progressPct)}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         <SpatialViewer
           jobId={jobId}
@@ -702,6 +925,9 @@ export default function UploadSection({
           hasData={scanData !== null}
           isDemo={isDemo}
           initialDamageAreaM2={scanData?.damageAreaM2 || 18.2}
+          isProcessing={isLoading || isProcessing}
+          progressPct={progressPct}
+          progressStage={progressStage}
           onDamageAreaChange={(newAreaM2) => {
             setScanData((prev) => prev ? { ...prev, damageAreaM2: newAreaM2 } : null);
             if (onJobLoaded && jobData) {

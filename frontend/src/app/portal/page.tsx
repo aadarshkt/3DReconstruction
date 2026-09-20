@@ -34,7 +34,7 @@ export default function UserPortalPage() {
     }
   }, [loading, user, token, isAdmin, router]);
 
-  // Check query parameters (e.g. ?tab=...)
+  // Check query parameters (e.g. ?tab=... & ?job_id=...) and localStorage on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -42,11 +42,25 @@ export default function UserPortalPage() {
       if (qTab && ["footage", "policy", "costs", "assistant"].includes(qTab)) {
         setActiveTab(qTab as any);
       }
+      const qJobId = params.get("job_id");
+      const savedJobId = localStorage.getItem("claimspace_active_job_id");
+      const activeId = qJobId || savedJobId;
+      if (activeId && !jobId) {
+        setJobId(activeId);
+      }
     }
   }, []);
 
   const handleJobLoaded = (data: any, demoFlag = false) => {
-    if (data.job_id) setJobId(data.job_id);
+    if (data.job_id) {
+      setJobId(data.job_id);
+      if (!demoFlag && !data.isDemo && !data.is_demo && typeof window !== "undefined") {
+        localStorage.setItem("claimspace_active_job_id", data.job_id);
+        const url = new URL(window.location.href);
+        url.searchParams.set("job_id", data.job_id);
+        window.history.replaceState({}, "", url.toString());
+      }
+    }
     if (data.claim_id) setClaimId(data.claim_id);
     setJobData(data);
     setIsDemoMode(demoFlag || Boolean(data.isDemo) || Boolean(data.is_demo));
@@ -59,6 +73,14 @@ export default function UserPortalPage() {
     setIsDemoMode(false);
     setIsProcessing(false);
     setStatusMessage("");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("claimspace_active_job_id");
+      localStorage.removeItem("claimspace_active_claim_id");
+      const url = new URL(window.location.href);
+      url.searchParams.delete("job_id");
+      url.searchParams.delete("claim_id");
+      window.history.replaceState({}, "", url.toString());
+    }
   };
 
   const handlePolicyAnalyzed = (analysis: any) => {
@@ -100,7 +122,7 @@ export default function UserPortalPage() {
                     <span>sample dataset</span>
                     <button
                       onClick={handleClearData}
-                      className="text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] underline ml-1"
+                      className="text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] underline ml-1 cursor-pointer"
                     >
                       clear
                     </button>
@@ -108,6 +130,13 @@ export default function UserPortalPage() {
                 ) : jobId ? (
                   <div className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-mono rounded border border-[var(--accent-subtle)] text-[var(--accent)] bg-[var(--bg-surface)]">
                     <span>live project · {jobId.slice(0, 8)}</span>
+                    <button
+                      onClick={handleClearData}
+                      className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline ml-1 cursor-pointer"
+                      title="Clear active project and start new capture"
+                    >
+                      clear
+                    </button>
                   </div>
                 ) : (
                   <div className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-mono rounded border border-[var(--border-subtle)] text-[var(--text-muted)] bg-[var(--bg-surface)]">
