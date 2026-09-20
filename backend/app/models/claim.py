@@ -17,6 +17,12 @@ from app.models.job import Base
 
 class ClaimStatus(str, enum.Enum):
     created           = "created"
+    collecting        = "collecting"
+    reconstructing    = "reconstructing"
+    assessing         = "assessing"
+    drafting          = "drafting"
+    ready_for_review  = "ready_for_review"
+    submitted         = "submitted"
     policy_uploading  = "policy_uploading"
     policy_indexed    = "policy_indexed"      # RAG ingestion complete
     analyzing_policy  = "analyzing_policy"

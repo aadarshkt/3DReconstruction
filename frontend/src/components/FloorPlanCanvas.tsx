@@ -306,7 +306,7 @@ export default function FloorPlanCanvas({
               x={0}
               y={7}
               width={220}
-              text={`💧 Damage: ${liveDamageAreaM2} m² (${roomCoveragePct}%)`}
+              text={`Damage Area: ${liveDamageAreaM2} m² (${roomCoveragePct}%)`}
               fill="#e28362"
               fontSize={12}
               fontStyle="bold"

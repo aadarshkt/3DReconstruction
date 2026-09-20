@@ -174,10 +174,6 @@ export default function CostEstimateSection({
         </div>
 
         <div className="rounded-2xl border p-8 sm:p-12 flex flex-col items-center justify-center text-center bg-[var(--bg-card)] border-[var(--border-subtle)] space-y-4">
-          <svg className="w-12 h-12 text-[var(--border-strong)]" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="6" y="6" width="36" height="36" rx="4" strokeDasharray="4 3" />
-            <path d="M14 24h20M24 14v20" strokeDasharray="2 2" strokeOpacity="0.5" />
-          </svg>
           <div className="space-y-1">
             <h3 className="font-serif text-base font-semibold text-[var(--text-primary)]">
               No Physical Measurements Available

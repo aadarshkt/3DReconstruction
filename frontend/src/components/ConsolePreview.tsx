@@ -46,9 +46,9 @@ export default function ConsolePreview() {
   const isInitialMount = useRef(true);
 
   const quickPrompts = [
-    { label: "💧 Is pipe burst covered?", q: "Is sudden water damage from a burst copper line covered under my policy?" },
-    { label: "📐 Room dimensions", q: "What are the exact room dimensions and wall lengths from the 3D LiDAR scan?" },
-    { label: "💵 Deductible calculation", q: "How is my $1,000 deductible applied against the gross repair estimate?" },
+    { label: "Is pipe burst covered?", q: "Is sudden water damage from a burst copper line covered under my policy?" },
+    { label: "Room dimensions", q: "What are the exact room dimensions and wall lengths from the 3D LiDAR scan?" },
+    { label: "Deductible calculation", q: "How is my $1,000 deductible applied against the gross repair estimate?" },
   ];
 
   const handleSend = async (queryText?: string) => {
@@ -289,7 +289,7 @@ export default function ConsolePreview() {
                   <div className="text-xs text-[var(--text-muted)] font-mono">Form HO3-8829104-NY</div>
                 </div>
                 <span className="px-2.5 py-1 rounded-full text-[11px] font-mono border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold">
-                  ✓ 100% Covered
+                  100% Covered
                 </span>
               </div>
 
@@ -477,7 +477,7 @@ export default function ConsolePreview() {
             <div className="p-4 rounded-xl border" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--accent)", boxShadow: "0 0 16px var(--accent-subtle)" }}>
               <div className="text-[10px] font-mono text-[var(--accent)] font-semibold uppercase tracking-wider">Net Claim Payout</div>
               <div className="font-serif text-2xl sm:text-3xl font-bold text-[var(--accent)] mt-1">$4,101.47</div>
-              <div className="text-xs font-medium text-[var(--text-primary)] mt-1">✓ Ready for carrier payout</div>
+              <div className="text-xs font-medium text-[var(--text-primary)] mt-1">Ready for carrier payout</div>
             </div>
           </div>
 

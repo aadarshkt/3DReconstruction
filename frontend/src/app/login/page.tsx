@@ -67,7 +67,7 @@ function LoginForm() {
               color: "var(--accent)",
             }}
           >
-            🔒 Sign in required to enter {redirectParam.startsWith("/portal") ? "your User Console" : "this workspace"}.
+            Sign in required to enter {redirectParam.startsWith("/portal") ? "your User Console" : "this workspace"}.
           </div>
         )}
 

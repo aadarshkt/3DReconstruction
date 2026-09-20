@@ -434,7 +434,7 @@ export default function PolicySection({
               className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 space-y-2.5 text-xs"
             >
               <div className="flex items-center gap-2 font-semibold text-amber-700 dark:text-amber-400">
-                <span>⚠️</span> Policy Deductible Not Explicitly Found in Document
+                <span>[Notice]</span> Policy Deductible Not Explicitly Found in Document
               </div>
               <p className="text-[var(--text-secondary)] leading-relaxed">
                 Standard policy jackets often omit individual homeowner deductible amounts (these typically appear on the separate Declarations Page). Please enter your policy deductible to calculate accurate net payouts:

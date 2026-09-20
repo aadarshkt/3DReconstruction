@@ -166,7 +166,7 @@ export default function SpatialViewer({
               backgroundColor: "var(--bg-surface)",
             }}
           >
-            {isInteracting ? "⚡ resizing damage zone" : `damage: ${liveDamageAreaM2} m² (${roomCoveragePct}%)`}
+            {isInteracting ? "resizing damage zone" : `damage: ${liveDamageAreaM2} m² (${roomCoveragePct}%)`}
           </span>
           <span className="hidden md:inline text-[var(--text-muted)]">Scale:</span>
           <span
@@ -222,10 +222,6 @@ export default function SpatialViewer({
             </div>
           ) : (
             <div className="relative w-full h-[380px] sm:h-[440px] rounded-xl border flex flex-col items-center justify-center p-6 text-center bg-[#181716] border-[var(--border-subtle)]">
-              <svg className="w-16 h-16 text-[var(--border-strong)] mb-3" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <rect x="8" y="8" width="32" height="32" rx="4" strokeDasharray="4 3" />
-                <path d="M8 20h32M20 8v32" strokeDasharray="2 2" strokeOpacity="0.5" />
-              </svg>
               <p className="text-sm font-medium text-[var(--text-primary)] font-serif">
                 No 2D floor plan loaded
               </p>
