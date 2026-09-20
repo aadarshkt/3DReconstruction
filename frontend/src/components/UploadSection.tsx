@@ -40,6 +40,7 @@ const getStageLabel = (stage: string) => STAGE_LABELS[stage] || stage || "Proces
 
 interface UploadSectionProps {
   jobId: string | null;
+  claimId?: string | null;
   onJobLoaded: (jobData: any, isDemo?: boolean) => void;
   isLoading?: boolean;
   setIsLoading?: (val: boolean) => void;
@@ -55,6 +56,7 @@ interface UploadSectionProps {
 
 export default function UploadSection({
   jobId,
+  claimId,
   onJobLoaded,
   isLoading: propLoading,
   setIsLoading: propSetIsLoading,
@@ -450,6 +452,9 @@ export default function UploadSection({
         formData.append("files", files[i]);
       }
       formData.append("auto_start", "false");
+      if (claimId) {
+        formData.append("claim_id", claimId);
+      }
 
       const res = await fetch("/jobs/create-and-upload", {
         method: "POST",
@@ -465,6 +470,10 @@ export default function UploadSection({
       setIsScaleSubmitted(false);
       setIsLoading(false);
       setProgressPct(100);
+
+      if (job.claim_id) {
+        onJobLoaded({ job_id: job.job_id, claim_id: job.claim_id, tier: job.tier }, false);
+      }
 
       // For native LiDAR scans, auto-start immediately
       if (job.tier === "lidar") {

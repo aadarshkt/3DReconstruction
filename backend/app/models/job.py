@@ -54,6 +54,11 @@ class Job(Base):
         primary_key=True,
         default=lambda: str(uuid.uuid4()),
     )
+    user_id: Optional[str] = Column(
+        String(128),
+        index=True,
+        nullable=True,
+    )
 
     # Input metadata
     tier: Tier = Column(SAEnum(Tier), nullable=False)

@@ -391,17 +391,28 @@ export default function CostEstimateSection({
         }}
       >
         <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b flex items-center justify-between flex-wrap gap-2" style={{ borderColor: "var(--border-subtle)" }}>
-          <div>
+          <div className="flex items-baseline gap-3 flex-wrap">
             <span className="font-serif text-base font-semibold text-[var(--text-primary)]">
               Itemized Scope of Work
             </span>
-            <span className="hidden sm:inline text-[11px] font-mono text-[var(--text-muted)] ml-3">
+            <span className="hidden sm:inline text-[11px] font-mono text-[var(--text-muted)]">
               Baseline Database: Standard US Restoration Averages
             </span>
           </div>
 
-          {/* Mobile view toggle */}
-          <div className="flex md:hidden items-center gap-1 p-0.5 rounded-lg border text-xs" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
+          <div className="flex items-center gap-2">
+            {claimId && (
+              <a
+                href={`/api/v1/executions/${claimId}/pdf`}
+                download
+                className="text-xs font-mono px-3 py-1.5 rounded-lg border border-[var(--border-default)] text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors cursor-pointer"
+              >
+                Download PDF Report
+              </a>
+            )}
+
+            {/* Mobile view toggle */}
+            <div className="flex md:hidden items-center gap-1 p-0.5 rounded-lg border text-xs" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-subtle)" }}>
             <button
               onClick={() => setMobileView("cards")}
               className={`px-2 py-0.5 rounded font-mono text-[11px] transition-colors ${
@@ -420,6 +431,7 @@ export default function CostEstimateSection({
             </button>
           </div>
         </div>
+      </div>
 
         {/* Mobile Cards View */}
         {mobileView === "cards" && (

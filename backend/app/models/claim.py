@@ -33,6 +33,15 @@ class Claim(Base):
         primary_key=True,
         default=lambda: str(uuid.uuid4()),
     )
+    user_id: Optional[str] = Column(
+        String(128),
+        index=True,
+        nullable=True,
+    )
+    title: Optional[str] = Column(
+        String(256),
+        nullable=True,
+    )
     job_id: Optional[str] = Column(
         UUID(as_uuid=False),
         ForeignKey("jobs.id", ondelete="SET NULL"),
@@ -55,6 +64,7 @@ class Claim(Base):
     insurer_name: Optional[str] = Column(String(128), nullable=True)
     has_policy_pdf: bool = Column(Boolean, nullable=False, default=False)
     policy_pdf_path: Optional[str] = Column(String(512), nullable=True)
+    policy_pdf_filename: Optional[str] = Column(String(256), nullable=True)
 
     # Results (populated by agents / RAG)
     policy_analysis: Optional[dict] = Column(JSON, nullable=True)
@@ -77,4 +87,27 @@ class Claim(Base):
         if "has_policy_pdf" not in kwargs:
             kwargs["has_policy_pdf"] = False
         super().__init__(**kwargs)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "title": self.title,
+            "job_id": self.job_id,
+            "status": self.status.value if hasattr(self.status, "value") else str(self.status),
+            "property_type": self.property_type,
+            "damage_description": self.damage_description,
+            "cause_of_loss": self.cause_of_loss,
+            "date_of_loss": self.date_of_loss,
+            "policy_number": self.policy_number,
+            "insurer_name": self.insurer_name,
+            "has_policy_pdf": self.has_policy_pdf,
+            "policy_pdf_filename": self.policy_pdf_filename,
+            "policy_analysis": self.policy_analysis,
+            "cost_estimate": self.cost_estimate,
+            "total_estimated_cost": self.total_estimated_cost,
+            "report_path": self.report_path,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
 

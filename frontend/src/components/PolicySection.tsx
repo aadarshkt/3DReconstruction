@@ -18,6 +18,7 @@ interface PolicyAnalysis {
 
 interface PolicySectionProps {
   claimId: string | null;
+  jobId?: string | null;
   onPolicyAnalyzed: (analysis: PolicyAnalysis) => void;
   isLoading?: boolean;
   setIsLoading?: (val: boolean) => void;
@@ -29,6 +30,7 @@ interface PolicySectionProps {
 
 export default function PolicySection({
   claimId,
+  jobId,
   onPolicyAnalyzed,
   isLoading: propLoading,
   setIsLoading: propSetIsLoading,
@@ -62,9 +64,35 @@ export default function PolicySection({
   const [customDeductible, setCustomDeductible] = useState<number | "">("");
   const [activeClaimId, setActiveClaimId] = useState<string | null>(claimId);
 
-  // Sync external claimId if provided
+  // Sync external claimId and fetch persisted state if available
   React.useEffect(() => {
-    if (claimId) setActiveClaimId(claimId);
+    if (claimId) {
+      setActiveClaimId(claimId);
+      const fetchClaimData = async () => {
+        try {
+          const res = await fetch(`/claims/${claimId}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.has_policy_pdf) {
+              setPolicyUploaded(true);
+              setUploadedFileName(data.policy_pdf_filename || "policy.pdf");
+            }
+            if (data.policy_analysis) {
+              setAnalysis(data.policy_analysis);
+              onPolicyAnalyzed(data.policy_analysis);
+            }
+            if (data.cause_of_loss) setCauseOfLoss(data.cause_of_loss);
+            if (data.damage_description) setDamageDescription(data.damage_description);
+          }
+        } catch (_) {}
+      };
+      fetchClaimData();
+    } else {
+      setActiveClaimId(null);
+      setPolicyUploaded(false);
+      setUploadedFileName(null);
+      setAnalysis(null);
+    }
   }, [claimId]);
 
   // Helper to ensure claim exists on the backend
@@ -75,6 +103,7 @@ export default function PolicySection({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          job_id: jobId || undefined,
           property_type: "residential",
           damage_description: damageDescription,
           cause_of_loss: causeOfLoss,
@@ -333,12 +362,22 @@ export default function PolicySection({
             Supports ISO HO-3, HO-5, commercial policies, or declarations schedules.
           </p>
           {policyUploaded && (
-            <label
-              htmlFor="policyPdfInput"
-              className="mt-2 text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent)] underline cursor-pointer"
-            >
-              Upload a different PDF
-            </label>
+            <div className="flex items-center gap-3 pt-2">
+              <a
+                href={`/claims/${activeClaimId}/policy/file`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-mono px-3 py-1.5 rounded-lg border border-[var(--border-default)] text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors cursor-pointer"
+              >
+                Download Policy Document
+              </a>
+              <label
+                htmlFor="policyPdfInput"
+                className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent)] underline cursor-pointer"
+              >
+                Upload a different PDF
+              </label>
+            </div>
           )}
 
           {isLoading && (

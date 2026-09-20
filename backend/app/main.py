@@ -26,6 +26,7 @@ from app.api import jobs as jobs_router
 from app.api import uploads as uploads_router
 from app.api import results as results_router
 from app.api import claims as claims_router
+from app.api import executions as executions_router
 
 log = structlog.get_logger()
 
@@ -39,6 +40,12 @@ async def lifespan(app: FastAPI):
         from sqlalchemy import text
         schema_patches = [
             "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS is_demo BOOLEAN DEFAULT FALSE;",
+            "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS user_id VARCHAR(128);",
+            "ALTER TABLE claims ADD COLUMN IF NOT EXISTS user_id VARCHAR(128);",
+            "ALTER TABLE claims ADD COLUMN IF NOT EXISTS title VARCHAR(256);",
+            "ALTER TABLE claims ADD COLUMN IF NOT EXISTS policy_pdf_filename VARCHAR(256);",
+            "CREATE INDEX IF NOT EXISTS ix_claims_user_id ON claims(user_id);",
+            "CREATE INDEX IF NOT EXISTS ix_jobs_user_id ON jobs(user_id);",
             "ALTER TABLE claims ADD COLUMN IF NOT EXISTS property_type VARCHAR(64) DEFAULT 'residential';",
             "ALTER TABLE claims ADD COLUMN IF NOT EXISTS damage_description TEXT DEFAULT '';",
             "ALTER TABLE claims ADD COLUMN IF NOT EXISTS date_of_loss VARCHAR(64);",
@@ -108,6 +115,8 @@ app.include_router(uploads_router.router, prefix="/jobs",    tags=["Uploads"])
 app.include_router(results_router.router, prefix="/jobs",    tags=["Results"])
 app.include_router(claims_router.router,  prefix="/api/v1/claims", tags=["Claims"])
 app.include_router(claims_router.router,  prefix="/claims",        tags=["Claims"])
+app.include_router(executions_router.router, prefix="/api/v1/executions", tags=["Executions"])
+app.include_router(executions_router.router, prefix="/executions",        tags=["Executions"])
 
 # ── Guided Tour Microservice Router (can be run standalone or unified) ──────
 try:

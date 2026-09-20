@@ -13,6 +13,7 @@ import shutil
 from pathlib import Path
 from typing import List, Optional
 
+from datetime import datetime, timezone
 import aiofiles
 import structlog
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -25,6 +26,8 @@ router = APIRouter()
 
 from app.config import settings, get_images_dir, get_job_dir
 from app.models.job import Job, JobStatus, Tier
+from app.models.claim import Claim, ClaimStatus
+from app.core.security import get_optional_user, AuthenticatedUser
 from app.main import get_db
 from app.tasks.celery_tasks import run_pipeline
 
@@ -149,14 +152,17 @@ async def create_and_upload(
     files: List[UploadFile] = File(..., description="One or more capture files"),
     scale_reference_m: Optional[str] = Form(None, description="Optional scale reference length in metres"),
     auto_start: bool = Form(False, description="Whether to enqueue reconstruction immediately"),
+    claim_id: Optional[str] = Form(None, description="Optional active claim/execution ID to link"),
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[AuthenticatedUser] = Depends(get_optional_user),
 ):
     """
     Unified multi-modal endpoint:
-    1. Creates a new Job
+    1. Creates a new Job (linked to user_id)
     2. Ingests all uploaded files (photos, video, LiDAR)
     3. Auto-determines Tier (photos, video, lidar, or hybrid)
-    4. Optionally starts pipeline immediately
+    4. Auto-creates or links to an Execution/Claim record
+    5. Optionally starts pipeline immediately
     """
     if not files:
         raise HTTPException(status_code=400, detail="No files provided.")
@@ -170,8 +176,10 @@ async def create_and_upload(
         except (ValueError, TypeError):
             parsed_scale_ref = None
 
+    user_id = current_user.id if current_user else None
+
     # Create placeholder job
-    job = Job(tier=Tier.photos, scale_reference_m=parsed_scale_ref)
+    job = Job(tier=Tier.photos, scale_reference_m=parsed_scale_ref, user_id=user_id)
     db.add(job)
     await db.commit()
     await db.refresh(job)
@@ -201,6 +209,31 @@ async def create_and_upload(
     await db.commit()
     await db.refresh(job)
 
+    # Link or auto-create Claim / Execution
+    claim = None
+    if claim_id:
+        claim = await db.get(Claim, claim_id)
+        if claim:
+            claim.job_id = job.id
+            if not claim.user_id and user_id:
+                claim.user_id = user_id
+
+    if not claim:
+        modality_title = job.tier.value.capitalize()
+        now_str = datetime.now(timezone.utc).strftime("%b %d, %Y")
+        claim = Claim(
+            job_id=job.id,
+            user_id=user_id,
+            title=f"{modality_title} Spatial Capture · {now_str}",
+            status=ClaimStatus.created,
+            property_type="residential",
+            cause_of_loss="water",
+        )
+        db.add(claim)
+
+    await db.commit()
+    await db.refresh(claim)
+
     celery_task_id = None
     if auto_start:
         task = run_pipeline.delay(job.id)
@@ -212,6 +245,9 @@ async def create_and_upload(
 
     return {
         "job_id": job.id,
+        "claim_id": claim.id,
+        "execution_id": claim.id,
+        "title": claim.title,
         "tier": job.tier.value,
         "status": job.status.value,
         "saved_files": saved,

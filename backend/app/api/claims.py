@@ -6,6 +6,7 @@ from typing import Any, Optional
 import aiofiles
 import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +19,8 @@ from app.demo import seed_demo_pipeline, SAMPLE_POLICY_PATH
 from app.main import get_db
 from app.models.claim import Claim, ClaimStatus
 from app.models.job import Job, JobStatus
+from app.core.security import require_admin, require_user, get_current_user, get_optional_user, AuthenticatedUser
+from app.pipeline.report_generator import generate_execution_pdf
 import shutil
 
 log = structlog.get_logger()
@@ -36,6 +39,7 @@ chat_router = ClaimChatRouter(
 # ── Pydantic Request / Response Schemas ─────────────────────────────────────────
 class ClaimCreateRequest(BaseModel):
     job_id: Optional[str] = Field(None, description="Optional associated 3D reconstruction job UUID")
+    title: Optional[str] = Field(None, description="Optional execution title")
     property_type: str = Field("residential", description="residential | commercial | industrial")
     damage_description: str = Field(..., description="Detailed description of the damage")
     cause_of_loss: str = Field("water", description="water | fire | wind | hail | other")
@@ -59,6 +63,7 @@ class ClaimQueryRequest(BaseModel):
 class ClaimResponse(BaseModel):
     id: str
     job_id: Optional[str] = None
+    title: Optional[str] = None
     status: str
     property_type: str
     damage_description: str
@@ -67,6 +72,7 @@ class ClaimResponse(BaseModel):
     policy_number: Optional[str] = None
     insurer_name: Optional[str] = None
     has_policy_pdf: bool = False
+    policy_pdf_filename: Optional[str] = None
     policy_analysis: Optional[dict[str, Any]] = None
     cost_estimate: Optional[dict[str, Any]] = None
     total_estimated_cost: Optional[float] = None
@@ -80,6 +86,7 @@ class ClaimResponse(BaseModel):
 async def create_claim(
     payload: ClaimCreateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[AuthenticatedUser] = Depends(get_optional_user),
 ):
     """Create a new insurance claim record."""
     if payload.job_id:
@@ -88,8 +95,12 @@ async def create_claim(
         if not job:
             raise HTTPException(status_code=404, detail=f"Job {payload.job_id} not found")
 
+    user_id = current_user.id if current_user else None
+
     claim = Claim(
         job_id=payload.job_id,
+        user_id=user_id,
+        title=payload.title or f"{payload.property_type.capitalize()} {payload.cause_of_loss.capitalize()} Damage Assessment",
         property_type=payload.property_type,
         damage_description=payload.damage_description,
         cause_of_loss=payload.cause_of_loss,
@@ -101,7 +112,7 @@ async def create_claim(
     db.add(claim)
     await db.commit()
     await db.refresh(claim)
-    log.info("claim_created", claim_id=claim.id)
+    log.info("claim_created", claim_id=claim.id, user_id=user_id)
     return claim
 
 
@@ -187,6 +198,7 @@ async def upload_policy(
 
         claim.has_policy_pdf = True
         claim.policy_pdf_path = str(pdf_path)
+        claim.policy_pdf_filename = file.filename
         claim.status = ClaimStatus.policy_indexed
         await db.commit()
         await db.refresh(claim)
@@ -231,6 +243,7 @@ async def load_sample_policy(
         ingest_stats = rag_engine.ingest_policy(claim_id, dest_pdf)
         claim.has_policy_pdf = True
         claim.policy_pdf_path = str(dest_pdf)
+        claim.policy_pdf_filename = "sample_ho3_policy.pdf"
         claim.status = ClaimStatus.policy_indexed
         await db.commit()
         await db.refresh(claim)
@@ -247,6 +260,33 @@ async def load_sample_policy(
         claim.error_message = f"Sample policy indexing failed: {str(e)}"
         await db.commit()
         raise HTTPException(status_code=500, detail=f"Failed to index sample policy: {str(e)}")
+
+
+@router.get("/{claim_id}/policy/file")
+async def download_claim_policy_file(
+    claim_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Download the original uploaded insurance policy PDF."""
+    claim = await db.get(Claim, claim_id)
+    if not claim:
+        raise HTTPException(status_code=404, detail=f"Claim {claim_id} not found")
+
+    if not claim.policy_pdf_path or not Path(claim.policy_pdf_path).exists():
+        claim_dir = get_claim_dir(claim.id)
+        if (claim_dir / "policy.pdf").exists():
+            claim.policy_pdf_path = str(claim_dir / "policy.pdf")
+            await db.commit()
+        else:
+            raise HTTPException(status_code=404, detail="No policy PDF document uploaded for this claim.")
+
+    filename = claim.policy_pdf_filename or "insurance_policy.pdf"
+    return FileResponse(
+        path=str(claim.policy_pdf_path),
+        media_type="application/pdf",
+        filename=filename,
+        content_disposition_type="inline",
+    )
 
 
 
@@ -427,11 +467,22 @@ async def estimate_claim_costs(
         await db.commit()
         await db.refresh(claim)
 
+        # Generate executive summary report PDF automatically
+        try:
+            pdf_path = get_claim_dir(claim_id) / "report.pdf"
+            generate_execution_pdf(claim, job, pdf_path)
+            claim.report_path = str(pdf_path)
+            await db.commit()
+            await db.refresh(claim)
+        except Exception as pe:
+            log.warning("pdf_report_gen_warning", claim_id=claim_id, error=str(pe))
+
         return {
             "status": "success",
             "claim_id": claim_id,
             "cost_estimate": claim.cost_estimate,
             "total_estimated_cost": claim.total_estimated_cost,
+            "report_url": f"/api/v1/executions/{claim_id}/pdf",
         }
     except Exception as e:
         log.error("cost_estimation_error", claim_id=claim_id, error=str(e))
@@ -439,6 +490,37 @@ async def estimate_claim_costs(
         claim.error_message = f"Cost estimation failed: {str(e)}"
         await db.commit()
         raise HTTPException(status_code=500, detail=f"Cost estimation failed: {str(e)}")
+
+
+@router.get("/{claim_id}/report.pdf")
+async def download_claim_report_pdf(
+    claim_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate or download the executive PDF assessment report for this claim."""
+    claim = await db.get(Claim, claim_id)
+    if not claim:
+        raise HTTPException(status_code=404, detail=f"Claim {claim_id} not found")
+
+    job = None
+    if claim.job_id:
+        job = await db.get(Job, claim.job_id)
+
+    claim_dir = get_claim_dir(claim.id)
+    pdf_path = claim_dir / "report.pdf"
+
+    if not pdf_path.exists():
+        generate_execution_pdf(claim, job, pdf_path)
+        claim.report_path = str(pdf_path)
+        await db.commit()
+
+    safe_title = (claim.title or f"ClaimSpace-Report-{claim.id[:8]}").replace(" ", "_").replace("/", "-")
+    return FileResponse(
+        path=str(pdf_path),
+        media_type="application/pdf",
+        filename=f"{safe_title}.pdf",
+        content_disposition_type="attachment",
+    )
 
 
 class ClaimChatMessage(BaseModel):

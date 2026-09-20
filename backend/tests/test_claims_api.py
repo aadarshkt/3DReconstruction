@@ -199,6 +199,10 @@ def test_load_sample_policy_endpoint(test_client):
 
 
 def test_seed_demo_endpoint(test_client):
+    from app.core.security import create_access_token
+    from app.models.user import UserRole
+    admin_token = create_access_token(user_id="admin-test", email="admin@example.com", role=UserRole.ADMIN)
+
     client, session = test_client
     with patch("app.api.claims.seed_demo_pipeline") as mock_seed:
         mock_seed.return_value = {
@@ -209,7 +213,7 @@ def test_seed_demo_endpoint(test_client):
             "policy_indexed": True,
             "ingest_stats": {"total_pages": 22, "total_chunks": 142},
         }
-        resp = client.post("/api/v1/claims/seed-demo")
+        resp = client.post("/api/v1/claims/seed-demo", headers={"Authorization": f"Bearer {admin_token}"})
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert data["status"] == "success"
